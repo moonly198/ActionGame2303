@@ -37,6 +37,17 @@ public:
 	PlayerStat
 	*/
 
+	UPROPERTY(EditAnywhere, Category = Stats)
+		float MaxHealth = 1000;
+
+	UPROPERTY(EditAnywhere, Category = Stats)
+		float Health = 800;
+
+	UPROPERTY(EditAnywhere, Category = Stats)
+		float MaxStamina = 1000;
+
+	UPROPERTY(EditAnywhere, Category = Stats)
+		float Stamina = 800;
 
 protected:
 	// Called when the game starts or when spawned
@@ -69,10 +80,22 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
+	//점프
+	void Jump();
+	void StopJump();
+
+	//구르기, 대쉬
+	void Dash();
+	void StopDash();
+
 	//타겟팅
 	void TargetingMode();
 	void TravelMode();
 
+	//공격 받았을시
+	void DecrementHealth(float Damage);
 
+	//공격
+	void Attacking();
 
 };

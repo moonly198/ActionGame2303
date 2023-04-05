@@ -1,3 +1,4 @@
+
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
@@ -48,6 +49,9 @@ AMain::AMain()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.f, 0.0f); //...at this rotation rate
 	GetCharacterMovement()->JumpZVelocity = 650.f;
 	GetCharacterMovement()->AirControl = 0.2f;
+
+
+
 }
 
 // Called when the game starts or when spawned
@@ -84,7 +88,63 @@ void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	PlayerInputComponent->BindAction("Targeting",IE_Pressed, this, &AMain::TargetingMode);
 	PlayerInputComponent->BindAction("Targeting",IE_Released, this, &AMain::TravelMode);
 
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AMain::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Released, this, &AMain::StopJump);
 
+	PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AMain::Dash);
+	PlayerInputComponent->BindAction("Dash", IE_Released, this, &AMain::StopDash);
+
+}
+
+void AMain::TargetingMode()
+{
+
+}
+
+void AMain::TravelMode()
+{
+
+}
+
+void AMain::DecrementHealth(float Damage)
+{
+
+}
+
+void AMain::Attacking()
+{
+
+}
+
+void AMain::Dash()
+{
+
+}
+
+void AMain::StopDash()
+{
+
+}
+
+void AMain::Jump()
+{
+
+}
+
+void AMain::StopJump()
+{
+
+}
+
+bool AMain::CanMove(float Value)
+{
+	if (MainPlayerController)
+	{
+		return (Value != 0.0f); //&&
+			//(!bAttacking) &&
+			//!MainPlayerController->bPauseMenuVisible;
+	}
+	return false;
 }
 
 void AMain::MoveForward(float Value)
@@ -134,17 +194,6 @@ void AMain::LookUp(float Value)
 	}
 }
 
-bool AMain::CanMove(float Value)
-{
-	if (MainPlayerController)
-	{
-		return (Value != 0.0f); //&&
-			//(!bAttacking) &&
-			//!MainPlayerController->bPauseMenuVisible;
-	}
-	return false;
-}
-
 void AMain::TurnAtRate(float Rate)
 {
 	AddControllerYawInput(Rate * BaseTurnRate * GetWorld()->GetDeltaSeconds());
@@ -153,15 +202,5 @@ void AMain::TurnAtRate(float Rate)
 void AMain::LookUpAtRate(float Rate)
 {
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
-}
-
-void AMain::TargetingMode()
-{
-
-}
-
-void AMain::TravelMode()
-{
-
 }
 
