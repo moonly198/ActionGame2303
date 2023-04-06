@@ -140,6 +140,7 @@ public:
 	void Dashing();
 	UPROPERTY(EditAnywhere)
 	float DashDistance = 6000.f;
+
 	UPROPERTY(VisibleAnywhere)
 		bool bDashing;
 
@@ -149,7 +150,19 @@ public:
 	UPROPERTY(EditAnywhere)
 		UAnimMontage* DashMontage;
 
-	void StopDash();
+
+	bool bLMBDown;
+	void LMBDown();
+	void LMBUp();
+
+	bool bRMBDown;
+	void RMBDown();
+	void RMBUp();
+
+	bool bESCDown;
+	void ESCDown();
+	void ESCUp();
+
 
 	//Å¸°ÙÆÃ
 	void TargetingMode();
@@ -170,5 +183,7 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Anims")
 		class UAnimMontage* CombatMontage;
+
+
 
 };

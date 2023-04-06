@@ -14,6 +14,7 @@
 #include "MainPlayerController.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "MainAnimInstance.h"
 
 // Sets default values
 AMain::AMain()
@@ -65,6 +66,9 @@ AMain::AMain()
 
 	bDashing = false;
 	
+	bLMBDown = false;
+	bRMBDown = false;
+	bESCDown = false;
 }
 
 
@@ -74,6 +78,7 @@ void AMain::BeginPlay()
 	Super::BeginPlay();
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
+	
 	
 	
 }
@@ -180,34 +185,21 @@ void AMain::Tick(float DeltaTime)
 
 	}
 
+
+	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
+	//대쉬 몽타주가 끝날때까지 달리지 못함
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (bDashing)
 	{
-		USkeletalMeshComponent* MainSkeletalMeshComponent = GetMesh();
-		UAnimInstance* AnimInstance = MainSkeletalMeshComponent->GetAnimInstance(); // 애님 인스턴스 생성
-
 		if (AnimInstance && DashMontage)
 		{
-			if (!AnimInstance->Montage_IsPlaying(DashMontage))// 몽타주 플레이가 아닐때만
-			{
-				AnimInstance->Montage_Play(DashMontage);
-			}
-
-
-			UAnimMontage* CurrentMontage = AnimInstance->GetCurrentActiveMontage(); //현재 애니메이션 몽타주 정보가져오기
-			FString Name = CurrentMontage->GetName();
-			UE_LOG(LogTemp, Warning, TEXT("%s"), &Name);
-			float MontageLength = CurrentMontage->GetPlayLength(); // 몽타주 애님 재생 시간확인
-			float CurrentPosition = AnimInstance->Montage_GetPosition(CurrentMontage); // 몽타주 현재 재생시간 확인 한번만 되는 것 같다
-			UE_LOG(LogTemp, Warning, TEXT("%f"), &CurrentPosition);
-			if (CurrentPosition >= MontageLength) //만약 현재 재생시간이 몽타주 길이보다 같거나 길면
+			if (!AnimInstance->Montage_IsPlaying(DashMontage))
 			{
 				bDashing = false;
 			}
-
 		}
-
 	}
-
+	
 }
 
 // Called to bind functionality to input
@@ -232,10 +224,18 @@ void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 
 	PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AMain::Dashing);
-	//PlayerInputComponent->BindAction("Dash", IE_Released, this, &AMain::StopDash);
 
 	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMain::ShiftKeyDown);
 	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AMain::ShiftKeyUp);
+
+	PlayerInputComponent->BindAction("LMB", IE_Pressed, this, &AMain::LMBDown);
+	PlayerInputComponent->BindAction("LMB", IE_Released, this, &AMain::LMBUp);
+
+	PlayerInputComponent->BindAction("RMB", IE_Pressed, this, &AMain::RMBDown);
+	PlayerInputComponent->BindAction("RMB", IE_Released, this, &AMain::RMBUp);
+
+	PlayerInputComponent->BindAction("ESC", IE_Pressed, this, &AMain::ESCDown);
+	PlayerInputComponent->BindAction("ESC", IE_Released, this, &AMain::ESCUp);
 }
 
 void AMain::SetMovementStatus(EMovementStatus Status)
@@ -287,21 +287,67 @@ void AMain::DecrementHealth(float Damage)
 
 void AMain::Dashing()
 {
-	if (!bDashing)
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	class UMainAnimInstance* MainAnimInstance;
+	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
+	if (MainAnimInstance != nullptr)
 	{
-		const FVector ForwardDir = this->GetActorRotation().Vector();
-		LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
-		bDashing = true;
+		if (!bDashing && !(MainAnimInstance->bIsInAir)) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
+		{
+			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
+			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
+			bDashing = true;
 
-		
+			if (AnimInstance && DashMontage)
+			{
+				AnimInstance->Montage_Play(DashMontage, 1);
 
+			}
+
+		}
 	}
+	
+	
+	
 	
 }
 
-void AMain::StopDash()
+
+void AMain::LMBDown()
 {
-	bDashing = false;
+
+}
+
+void AMain::LMBUp()
+{
+
+}
+
+
+void AMain::RMBDown()
+{
+
+}
+
+void AMain::RMBUp()
+{
+
+}
+
+
+void AMain::ESCDown()
+{
+	bESCDown = true;
+	if (MainPlayerController)
+	{
+		MainPlayerController->TogglePauseMenu();
+	}
+}
+
+void AMain::ESCUp()
+{
+	bESCDown = false;
 }
 
 
@@ -323,12 +369,12 @@ void AMain::Die()
 
 void AMain::Jump()
 {
-	/*
+	
 	if (MainPlayerController)
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
-	*/
-	if (!bDashing)
+	
+	if (bDashing)
 		return;
 	Super::Jump();
 	
@@ -341,9 +387,9 @@ bool AMain::CanMove(float Value)
 	if (MainPlayerController)
 	{
 		return (Value != 0.0f) &&
-			 (!bDashing); //&&
-			//(!bAttacking) &&
-			//!MainPlayerController->bPauseMenuVisible;
+			 (!bDashing) &&
+			(!bAttacking) &&
+			!MainPlayerController->bPauseMenuVisible;
 	}
 	return false;
 }

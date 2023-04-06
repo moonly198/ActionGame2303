@@ -23,6 +23,25 @@ public:
 	//위젯을 생선한 후 위젯을 담을 변수
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		UUserWidget* HUDOverlay;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget>WPauseMenu;
+
+	//위젯을 생선한 후 위젯을 담을 변수
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* PauseMenu;
+
+	bool bPauseMenuVisible;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "HUD")
+		void DisplayPauseMenu();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "HUD")
+		void RemovePauseMenu();
+
+	void TogglePauseMenu();
+
+	void GameModeOnly();
 	
 protected:
 	virtual void BeginPlay() override;
