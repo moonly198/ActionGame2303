@@ -140,6 +140,9 @@ public:
 	void Dashing();
 	UPROPERTY(EditAnywhere)
 	float DashDistance = 6000.f;
+	
+	UPROPERTY(EditAnywhere)
+	float DashStamina = 150.f;
 
 	UPROPERTY(VisibleAnywhere)
 		bool bDashing;
@@ -149,6 +152,8 @@ public:
 
 	UPROPERTY(EditAnywhere)
 		UAnimMontage* DashMontage;
+
+
 
 
 	bool bLMBDown;

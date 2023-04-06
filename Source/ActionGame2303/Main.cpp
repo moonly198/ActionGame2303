@@ -79,8 +79,6 @@ void AMain::BeginPlay()
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
 	
-	
-	
 }
 
 // Called every frame
@@ -94,7 +92,7 @@ void AMain::Tick(float DeltaTime)
 	switch (StaminaStatus)
 	{
 		case EStaminaStatus::ESS_Normal:
-			if (bShiftKeyDown)
+			if (bShiftKeyDown || bDashing)
 			{
 				if (Stamina - DeltaStamina <= MinSprintStamina)
 				{
@@ -122,7 +120,7 @@ void AMain::Tick(float DeltaTime)
 			break;
 
 		case EStaminaStatus::ESS_BelowMinimum:
-			if (bShiftKeyDown)
+			if (bShiftKeyDown || bDashing)
 			{
 				if (Stamina - DeltaStamina <= 0.f)
 				{
@@ -135,7 +133,7 @@ void AMain::Tick(float DeltaTime)
 					Stamina -= DeltaStamina;
 					SetMovementStatus(EMovementStatus::EMS_Sprinting);
 				}
-				SetMovementStatus(EMovementStatus::EMS_Normal);
+				//SetMovementStatus(EMovementStatus::EMS_Normal);
 			}
 			else // shift Key up
 			{
@@ -153,7 +151,7 @@ void AMain::Tick(float DeltaTime)
 			break;
 
 		case EStaminaStatus::ESS_Exhausted:
-			if (bShiftKeyDown)
+			if (bShiftKeyDown || bDashing)
 			{
 				Stamina = 0.f;
 			}
@@ -287,16 +285,17 @@ void AMain::DecrementHealth(float Damage)
 
 void AMain::Dashing()
 {
-
+	UE_LOG(LogTemp, Warning, TEXT("Dash!"));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	class UMainAnimInstance* MainAnimInstance;
 	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
 	if (MainAnimInstance != nullptr)
 	{
-		if (!bDashing && !(MainAnimInstance->bIsInAir)) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
+		if (!bDashing && !(MainAnimInstance->bIsInAir) && Stamina >= DashStamina) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
 		{
 			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
 			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
+			Stamina -= DashStamina;
 			bDashing = true;
 
 			if (AnimInstance && DashMontage)
@@ -307,9 +306,6 @@ void AMain::Dashing()
 
 		}
 	}
-	
-	
-	
 	
 }
 
