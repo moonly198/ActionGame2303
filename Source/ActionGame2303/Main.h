@@ -6,6 +6,27 @@
 #include "GameFramework/Character.h"
 #include "Main.generated.h"
 
+UENUM(BlueprintType)
+enum class EMovementStatus : uint8
+{
+	EMS_Normal UMETA(DisplayName = "Normal"),
+	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
+
+	EMS_MAX UMETA(DisplayName = "DefaultMAX")
+};
+
+UENUM(BlueprintType)
+enum class EStaminaStatus : uint8
+{
+	ESS_Normal UMETA(DisplayName = "Normal"),
+	ESS_BelowMinimum UMETA(DisplayName = "BelowMinimum"),
+	ESS_Exhausted UMETA(DisplayName = "Exhausted"),
+	ESS_ExhaustedRecovering UMETA(DisplayName = "ExhaustedRecovering"),
+
+	ESS_MAX UMETA(DisplayName = "DefaultMAX")
+
+};
+
 UCLASS()
 class ACTIONGAME2303_API AMain : public ACharacter
 {
@@ -33,21 +54,52 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 		float BaseLookUpRate;
 
+	//ENUM Status BlueprintReadWrite
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Enums")
+		EMovementStatus MovementStatus;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Enums")
+		EStaminaStatus StaminaStatus;
+
+	FORCEINLINE void SetStaminaStatus(EStaminaStatus status) { StaminaStatus = status; }
+
+	//스태미너 감소율
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+		float StaminaDrainRate;
+
+	//스태미너 지치는 범위
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+		float MinSprintStamina;
+
+	// 움직임 상태 설정과 달리는 속도
+	void SetMovementStatus(EMovementStatus Status);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+		float RunningSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+		float SprintingSpeed;
+
+	bool bShiftKeyDown;
+
+	void ShiftKeyDown();
+
+	void ShiftKeyUp();
 	/*
 	PlayerStat
 	*/
 
-	UPROPERTY(EditAnywhere, Category = Stats)
-		float MaxHealth = 1000;
+	UPROPERTY(EditAnywhere,BlueprintReadOnly, Category = "Player Stats")
+		float MaxHealth = 1000.f;
 
-	UPROPERTY(EditAnywhere, Category = Stats)
-		float Health = 800;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
+		float Health = 800.f;
 
-	UPROPERTY(EditAnywhere, Category = Stats)
-		float MaxStamina = 1000;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
+		float MaxStamina = 1000.f;
 
-	UPROPERTY(EditAnywhere, Category = Stats)
-		float Stamina = 800;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
+		float Stamina = 800.f;
 
 protected:
 	// Called when the game starts or when spawned
@@ -82,10 +134,21 @@ public:
 
 	//점프
 	void Jump();
-	void StopJump();
+	
 
 	//구르기, 대쉬
-	void Dash();
+	void Dashing();
+	UPROPERTY(EditAnywhere)
+	float DashDistance = 6000.f;
+	UPROPERTY(VisibleAnywhere)
+		bool bDashing;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bPlayingDashMontage;
+
+	UPROPERTY(EditAnywhere)
+		UAnimMontage* DashMontage;
+
 	void StopDash();
 
 	//타겟팅
@@ -94,8 +157,18 @@ public:
 
 	//공격 받았을시
 	void DecrementHealth(float Damage);
+	void Die();
 
 	//공격
-	void Attacking();
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Anims")
+		bool bAttacking;
+
+	void Attack();
+
+	UFUNCTION(BlueprintCallable)
+		void AttackEnd();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Anims")
+		class UAnimMontage* CombatMontage;
 
 };
