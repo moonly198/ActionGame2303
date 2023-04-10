@@ -61,14 +61,19 @@ AMain::AMain()
 
 	RunningSpeed = 650.f;
 	SprintingSpeed = 950.f;
+	WalkingSpeed = 300.f;
+
 
 	bShiftKeyDown = false;
+	bCtrlKeyDown = false;
 
 	bDashing = false;
 	
 	bLMBDown = false;
 	bRMBDown = false;
 	bESCDown = false;
+
+	CurrentComboCount = 0;
 }
 
 
@@ -92,7 +97,7 @@ void AMain::Tick(float DeltaTime)
 	switch (StaminaStatus)
 	{
 		case EStaminaStatus::ESS_Normal:
-			if (bShiftKeyDown || bDashing)
+			if ((bShiftKeyDown || bDashing )&& !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 BelowMinimum으로 상태가 변함
 			{
 				if (Stamina - DeltaStamina <= MinSprintStamina)
 				{
@@ -105,7 +110,7 @@ void AMain::Tick(float DeltaTime)
 				}
 				SetMovementStatus(EMovementStatus::EMS_Sprinting);
 			}
-			else //shift Key up
+			else if(!bShiftKeyDown || !bDashing || bCtrlKeyDown) //shift Key up 혹은 대쉬 안할때
 			{
 				if (Stamina + DeltaStamina >= MaxStamina)
 				{
@@ -115,12 +120,15 @@ void AMain::Tick(float DeltaTime)
 				{
 					Stamina += DeltaStamina;
 				}
-				SetMovementStatus(EMovementStatus::EMS_Normal);
+				if(!bCtrlKeyDown)
+					SetMovementStatus(EMovementStatus::EMS_Normal);
+				else
+					SetMovementStatus(EMovementStatus::EMS_Walking);
 			}
 			break;
 
 		case EStaminaStatus::ESS_BelowMinimum:
-			if (bShiftKeyDown || bDashing)
+			if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
 			{
 				if (Stamina - DeltaStamina <= 0.f)
 				{
@@ -135,10 +143,11 @@ void AMain::Tick(float DeltaTime)
 				}
 				//SetMovementStatus(EMovementStatus::EMS_Normal);
 			}
-			else // shift Key up
+			else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown) // shift Key up
 			{
 				if (Stamina + DeltaStamina >= MinSprintStamina)
 				{
+					
 					SetStaminaStatus(EStaminaStatus::ESS_Normal);
 					Stamina += DeltaStamina;
 				}
@@ -151,16 +160,20 @@ void AMain::Tick(float DeltaTime)
 			break;
 
 		case EStaminaStatus::ESS_Exhausted:
-			if (bShiftKeyDown || bDashing)
+			if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
 			{
 				Stamina = 0.f;
 			}
-			else // shift Key up
+			else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown)// shift Key up
 			{
 				SetStaminaStatus(EStaminaStatus::ESS_ExhaustedRecovering);
 				Stamina += DeltaStamina;
 			}
-			SetMovementStatus(EMovementStatus::EMS_Normal);
+
+			if(!bCtrlKeyDown)
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			else
+				SetMovementStatus(EMovementStatus::EMS_Walking);
 			break;
 
 		case EStaminaStatus::ESS_ExhaustedRecovering:
@@ -174,7 +187,11 @@ void AMain::Tick(float DeltaTime)
 			{
 				Stamina += DeltaStamina;
 			}
-			SetMovementStatus(EMovementStatus::EMS_Normal);
+
+			if (!bCtrlKeyDown)
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			else
+				SetMovementStatus(EMovementStatus::EMS_Walking);
 
 			break;
 
@@ -197,8 +214,14 @@ void AMain::Tick(float DeltaTime)
 			}
 		}
 	}
-	
+
+	if (AnimInstance->Montage_IsPlaying(CombatMontage))
+	{
+		MontagePosition = AnimInstance->Montage_GetPosition(CombatMontage); //매프레임만다 현재 재생되는 포지션을 가져옴
+		//UE_LOG(LogTemp, Warning, TEXT("%02f"), MontagePosition);
+	}
 }
+	
 
 // Called to bind functionality to input
 void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -225,6 +248,9 @@ void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &AMain::ShiftKeyDown);
 	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &AMain::ShiftKeyUp);
+	
+	PlayerInputComponent->BindAction("Walk", IE_Pressed, this, &AMain::CtrlKeyDown);
+	PlayerInputComponent->BindAction("Walk", IE_Released, this, &AMain::CtrlKeyUp);
 
 	PlayerInputComponent->BindAction("LMB", IE_Pressed, this, &AMain::LMBDown);
 	PlayerInputComponent->BindAction("LMB", IE_Released, this, &AMain::LMBUp);
@@ -243,10 +269,14 @@ void AMain::SetMovementStatus(EMovementStatus Status)
 	{
 		GetCharacterMovement()->MaxWalkSpeed = SprintingSpeed;
 	}
-	else
+	else if (MovementStatus == EMovementStatus::EMS_Normal)
 	{
 		GetCharacterMovement()->MaxWalkSpeed = RunningSpeed;
 
+	}
+	else if (MovementStatus == EMovementStatus::EMS_Walking)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = WalkingSpeed;
 	}
 }
 
@@ -260,27 +290,16 @@ void AMain::ShiftKeyUp()
 	bShiftKeyDown = false;
 }
 
-void AMain::TargetingMode()
+void AMain::CtrlKeyDown()
 {
-
+	bCtrlKeyDown = true;
+	SetMovementStatus(EMovementStatus::EMS_Walking);
 }
 
-void AMain::TravelMode()
+void AMain::CtrlKeyUp()
 {
-
-}
-
-void AMain::DecrementHealth(float Damage)
-{
-	if (Health - Damage <= 0.f)
-	{
-		Health -= Damage;
-		Die();
-	}
-	else
-	{
-		Health -= Damage;
-	}
+	bCtrlKeyDown = false;
+	SetMovementStatus(EMovementStatus::EMS_Normal);
 }
 
 void AMain::Dashing()
@@ -310,16 +329,112 @@ void AMain::Dashing()
 }
 
 
+void AMain::DecrementHealth(float Damage)
+{
+	if (Health - Damage <= 0.f)
+	{
+		Health -= Damage;
+		Die();
+	}
+	else
+	{
+		Health -= Damage;
+	}
+}
+
+void AMain::TargetingMode()
+{
+
+}
+
+void AMain::TravelMode()
+{
+
+}
+
 void AMain::LMBDown()
 {
+	bLMBDown = true;
+	
+	if (MainPlayerController)
+		if (MainPlayerController->bPauseMenuVisible)
+			return;
+	Attack();
 
 }
 
 void AMain::LMBUp()
 {
-
+	bLMBDown = false;
 }
 
+void AMain::Attack()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
+	if (!bAttacking)
+	{
+		bAttacking = true;
+		
+		CurrentComboCount ++;
+		//애니메이션 몽타주 재생하는법
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
+		
+		UE_LOG(LogTemp, Warning, TEXT("%02f"), MontagePosition);
+
+		if (AnimInstance && CombatMontage)
+		{
+			
+
+				/*switch (CurrentComboCount)
+				{
+				case 1:
+					bCanCombo = true;
+					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_JumpToSection(FName("Attack_1"), CombatMontage);
+					UE_LOG(LogTemp, Warning, TEXT("case1 Current CC : %d"), CurrentComboCount);
+					break;
+
+				case 2:
+					bCanCombo = true;
+					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_JumpToSection(FName("Attack_2"), CombatMontage);
+					
+					break;
+
+				case 3:
+					bCanCombo = false;
+					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
+					UE_LOG(LogTemp, Warning, TEXT("333"));
+					AttackEnd();
+					break;
+				default:
+					break;
+				}
+			*/
+		}
+	}
+}
+
+void AMain::AttackEnd()
+{
+	bAttacking = false;
+	UE_LOG(LogTemp, Warning, TEXT("AttackEnd CurrentComnoCount : %d"), CurrentComboCount);
+	CurrentComboCount = 0;
+	UE_LOG(LogTemp, Warning, TEXT("aaaa"));
+	/*
+	if (bLMBDown)
+	{
+		Attack();
+	}
+	*/
+}
+
+void AMain::Die()
+{
+
+}
 
 void AMain::RMBDown()
 {
@@ -347,20 +462,6 @@ void AMain::ESCUp()
 }
 
 
-void AMain::Attack()
-{
-
-}
-
-void AMain::AttackEnd()
-{
-
-}
-
-void AMain::Die()
-{
-
-}
 
 
 void AMain::Jump()

@@ -1,0 +1,55 @@
+움직임
+Ability_Dash		대쉬
+Ability_CirclingWolves	회복 등등 스킬
+Death A			크게 나가떨어질때/ 죽을때
+Cast			공격 막기 
+HitReact_Back / Front / Left / Right 작게 맞았을때
+Idle 혹은 Idle_stand	안움직일때
+Jog_Bwd / Fwd / Left / Right	타게팅 시뛰는 방향 
+Jog_start			뛰기 시작
+Jog_stop			뛰기 멈추기
+Pivot_180			뛰는 방향 반대로 바로 다시 뛸때
+Jump_Start/Apex/Land/Recovery 점프 관련 시작 착지 착지후	
+KnockBAck_Front		뒤로 넘어지기, 크게 나가 떨어질때
+Respawn			스폰
+
+TravelMode_Fwd		타게팅X 달릴때
+
+Ablilty_AttackWolves_Cast_L 회복 스킬 쓸때
+
+공격
+PrimaryMelee_Air		점프공격
+PrimaryMelee_B_Slow	오른쪽으로 한바퀴 돌려 공격
+PrimaryMelee_B_Slow_Recovery 후 쉬기
+PrimaryMelee_B_Idle	한바퀴 돌려 공격 후 쉬기
+PrimaryMelee_C_Slow	한바퀴 돌려 오른쪽 아래에서 왼쪽 위로 올려치기
+PrimaryMelee_C_Slow2	오른쪽 아래에서 왼쪽 위로 올려치기
+PrimaryMelee_D_Slow	왼쪽 위에서 오른쪽 아래로 내려치기
+
+Stunned_Start / Loop 	스태미너 고갈시
+
+
+CombatMontage 순서
+PrimaryMelee_D_Slow 	왼쪽 위에서 오른쪽 아래 내려치기
+PrimaryMelee_C_Slow2	오른쪽 아래에서 왼쪽 위로 올려치기
+PrimaryMelee_B_Slow	오른쪽으로 한바퀴 돌려 공격
+
+
+
+
+키 입력
+WASD - 이동
+마우스 움직임 - 카메라 회전
+마우스 왼쪽 버튼(LMB) - 공격
+마우스 오른쪽 버튼(RMB) - 패링,막기
+E - 대쉬
+왼쪽 Shift - 달리기
+왼쪽 Ctrl - 걷기
+ESC,CapsLock - 일시정지 메뉴
+
+
+
+
+
+
+

@@ -11,6 +11,7 @@ enum class EMovementStatus : uint8
 {
 	EMS_Normal UMETA(DisplayName = "Normal"),
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
+	EMS_Walking UMETA(DisplayName = "Walking"),
 
 	EMS_MAX UMETA(DisplayName = "DefaultMAX")
 };
@@ -38,6 +39,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller")
 		class AMainPlayerController* MainPlayerController;
+
+	
 
 	//플레이어 뒤에 위치한 카메라 거리 빨간줄
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -80,11 +83,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
 		float SprintingSpeed;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+		float WalkingSpeed;
+
 	bool bShiftKeyDown;
-
 	void ShiftKeyDown();
-
 	void ShiftKeyUp();
+
+	bool bCtrlKeyDown;
+	void CtrlKeyDown();
+	void CtrlKeyUp();
 	/*
 	PlayerStat
 	*/
@@ -155,7 +163,7 @@ public:
 
 
 
-
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
 	bool bLMBDown;
 	void LMBDown();
 	void LMBUp();
@@ -178,7 +186,7 @@ public:
 	void Die();
 
 	//공격
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Anims")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		bool bAttacking;
 
 	void Attack();
@@ -186,8 +194,17 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void AttackEnd();
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Anims")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
 		class UAnimMontage* CombatMontage;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+		int CurrentComboCount = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+		bool bCanCombo = false;
+
+	float MontagePosition = 0.f;
+
 
 
 
