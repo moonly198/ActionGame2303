@@ -41,5 +41,3 @@ void UMainAnimInstance::UpdateAnimationProperties()
 	}
 
 }
-
-

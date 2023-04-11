@@ -10,11 +10,16 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "MainPlayerController.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "MainAnimInstance.h"
+#include "Components/BoxComponent.h"
+#include "Mutant.h"
+#include "Sound/SoundCue.h"
+#include "Engine/SkeletalMeshSocket.h"
 
 // Sets default values
 AMain::AMain()
@@ -40,6 +45,10 @@ AMain::AMain()
 	//회전율 설정
 	BaseTurnRate = 65.f;
 	BaseLookUpRate = 65.f;
+
+
+	CombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("CombatCollision"));
+	CombatCollision->SetupAttachment(GetMesh(), FName("Sword_Strike"));
 
 	//Don't rotate when the controller rotates.
 	//Let that just affect the camera.
@@ -74,6 +83,16 @@ AMain::AMain()
 	bESCDown = false;
 
 	CurrentComboCount = 0;
+
+	InterpSpeed = 15.f;
+	bInterpToEnemy = false;
+
+	bHasCombatTarget = false;
+
+	bMovingForward = false;
+	bMovingRight = false;
+
+	
 }
 
 
@@ -83,6 +102,15 @@ void AMain::BeginPlay()
 	Super::BeginPlay();
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
+
+	CombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
+	CombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
+
+	CombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+	CombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	CombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+
 	
 }
 
@@ -203,9 +231,10 @@ void AMain::Tick(float DeltaTime)
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
 	//대쉬 몽타주가 끝날때까지 달리지 못함
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	
 	if (bDashing)
 	{
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && DashMontage)
 		{
 			if (!AnimInstance->Montage_IsPlaying(DashMontage))
@@ -215,11 +244,34 @@ void AMain::Tick(float DeltaTime)
 		}
 	}
 
-	if (AnimInstance->Montage_IsPlaying(CombatMontage))
+	if (bAttacking)
 	{
-		MontagePosition = AnimInstance->Montage_GetPosition(CombatMontage); //매프레임만다 현재 재생되는 포지션을 가져옴
-		//UE_LOG(LogTemp, Warning, TEXT("%02f"), MontagePosition);
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		//MontageEnd = AnimInstance->Montage_GetPosition(CombatMontage);
+		ShiftKeyUp();
+		/*
+		if (!AnimInstance->Montage_IsPlaying(CombatMontage))
+			bMontageEnd = true;
+		else
+			bMontageEnd = false;
+		*/
 	}
+
+	if (bInterpToEnemy && CombatTarget)
+	{
+		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
+		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
+
+		SetActorRotation(InterpRotation);
+	}
+
+}
+
+FRotator AMain::GetLookAtRotationYaw(FVector Target)
+{
+	FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Target);
+	FRotator LookAtRotationYaw(0.f, LookAtRotation.Yaw, 0.f);
+	return LookAtRotationYaw;
 }
 	
 
@@ -310,7 +362,7 @@ void AMain::Dashing()
 	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
 	if (MainAnimInstance != nullptr)
 	{
-		if (!bDashing && !(MainAnimInstance->bIsInAir) && Stamina >= DashStamina) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
+		if ((!bDashing) && !(MainAnimInstance->bIsInAir) && (Stamina >= DashStamina) && (!bAttacking)) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
 		{
 			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
 			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
@@ -354,13 +406,37 @@ void AMain::TravelMode()
 
 void AMain::LMBDown()
 {
-	bLMBDown = true;
-	
 	if (MainPlayerController)
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
-	Attack();
 
+	
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	
+	if (bFirstClick)
+	{
+		Attack();
+		bFirstClick = false;
+		LastLeftClickTime = CurrentTime;
+		
+	}
+	else if ((!bLMBDown)&&(CurrentTime - LastLeftClickTime < ClickInterval) && !LastAttack)// && !bMontageEnd)
+	{
+		// Double click
+		
+		NextAttackAnim();
+		LastLeftClickTime = CurrentTime;
+	}
+	else
+	{
+		// Single click
+		Attack();
+	}
+	
+	
+	
+	bLMBDown = true;
 }
 
 void AMain::LMBUp()
@@ -373,46 +449,39 @@ void AMain::Attack()
 	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
 	if (!bAttacking)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
 		bAttacking = true;
 		
-		CurrentComboCount ++;
+		
 		//애니메이션 몽타주 재생하는법
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-
-		
-		UE_LOG(LogTemp, Warning, TEXT("%02f"), MontagePosition);
-
 		if (AnimInstance && CombatMontage)
 		{
+			if (CurrentComboCount == 0)
+			{
+				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Attack_1"), CombatMontage);
+				
+				
+			}
+			else if (CurrentComboCount == 1)
+			{
+				
+				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Attack_2"), CombatMontage);
+				
+			}
+			else if (CurrentComboCount == 2)
+			{
+				
+				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
+				
+				LastAttack = true;
+			}
+
 			
-
-				/*switch (CurrentComboCount)
-				{
-				case 1:
-					bCanCombo = true;
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
-					AnimInstance->Montage_JumpToSection(FName("Attack_1"), CombatMontage);
-					UE_LOG(LogTemp, Warning, TEXT("case1 Current CC : %d"), CurrentComboCount);
-					break;
-
-				case 2:
-					bCanCombo = true;
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
-					AnimInstance->Montage_JumpToSection(FName("Attack_2"), CombatMontage);
-					
-					break;
-
-				case 3:
-					bCanCombo = false;
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
-					AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
-					UE_LOG(LogTemp, Warning, TEXT("333"));
-					AttackEnd();
-					break;
-				default:
-					break;
-				}
-			*/
+				
 		}
 	}
 }
@@ -420,16 +489,37 @@ void AMain::Attack()
 void AMain::AttackEnd()
 {
 	bAttacking = false;
-	UE_LOG(LogTemp, Warning, TEXT("AttackEnd CurrentComnoCount : %d"), CurrentComboCount);
+	bFirstClick = true;
+	LastAttack = false;
 	CurrentComboCount = 0;
-	UE_LOG(LogTemp, Warning, TEXT("aaaa"));
-	/*
 	if (bLMBDown)
 	{
 		Attack();
 	}
-	*/
+	
 }
+
+
+void AMain::NextAttackAnim()
+{
+	
+	bAttacking = false;
+	CurrentComboCount++;
+	Attack();
+}
+
+void AMain::PlaySwingSound()
+{
+	
+		UGameplayStatics::PlaySound2D(this,SwingSound);
+	
+}
+
+void AMain::SetInterpToEnemy(bool Interp)
+{
+	bInterpToEnemy = Interp;
+}
+
 
 void AMain::Die()
 {
@@ -471,8 +561,9 @@ void AMain::Jump()
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
 	
-	if (bDashing)
+	if (bDashing || bAttacking)
 		return;
+
 	Super::Jump();
 	
 }
@@ -548,3 +639,43 @@ void AMain::LookUpAtRate(float Rate)
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
+void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor)
+	{
+		AMutant* Enemy = Cast<AMutant>(OtherActor);
+		if (Enemy)
+		{
+			if (Enemy->HitParticles)
+			{
+				const USkeletalMeshSocket* WeaponSocket = SkeletalMesh->GetSocketByName("Sword_Tip");
+				if (WeaponSocket)
+				{
+					FVector SocketLocation = WeaponSocket->GetSocketLocation(SkeletalMesh);
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Enemy->HitParticles, SocketLocation, FRotator(0.f), false);
+				}
+			}
+			if (Enemy->HitSound)
+			{
+				UGameplayStatics::PlaySound2D(this, Enemy->HitSound);
+			}
+
+		}
+	}
+}
+
+void AMain::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+
+}
+
+void AMain::ActivateCollision()
+{
+	CombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+}
+
+
+void AMain::DeactivateCollision()
+{
+	CombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}

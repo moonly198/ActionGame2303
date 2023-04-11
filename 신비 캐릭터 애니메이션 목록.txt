@@ -2,7 +2,7 @@
 Ability_Dash		대쉬
 Ability_CirclingWolves	회복 등등 스킬
 Death A			크게 나가떨어질때/ 죽을때
-Cast			공격 막기 
+Cast				공격 막기 
 HitReact_Back / Front / Left / Right 작게 맞았을때
 Idle 혹은 Idle_stand	안움직일때
 Jog_Bwd / Fwd / Left / Right	타게팅 시뛰는 방향 

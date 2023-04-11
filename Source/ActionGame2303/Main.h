@@ -37,8 +37,46 @@ public:
 	// Sets default values for this character's properties
 	AMain();
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		bool bHasCombatTarget;
+
+	FORCEINLINE void SetHasCombatTarget(bool HasTarget) { bHasCombatTarget = HasTarget; }
+
+	UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Combat")
+		FVector CombatTargetLocation;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller")
 		class AMainPlayerController* MainPlayerController;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "SKeletalMesh")
+		class USkeletalMeshComponent* SkeletalMesh;
+
+	//무기관련
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		class UParticleSystem* HitParticles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		class USoundCue* HitSound;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item | Combat")
+		class UBoxComponent* CombatCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item | Sound")
+		class USoundCue* SwingSound;
+
+	//공격시 에너미 쪽을 향해 캐릭터 회전
+	float InterpSpeed;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+		bool bInterpToEnemy;
+	void SetInterpToEnemy(bool Interp);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		class AMutant* CombatTarget;
+
+	FORCEINLINE void SetCombatTarget(AMutant* Target) { CombatTarget = Target; }
+
+	FRotator GetLookAtRotationYaw(FVector Target);
 
 	
 
@@ -142,7 +180,6 @@ public:
 
 	//점프
 	void Jump();
-	
 
 	//구르기, 대쉬
 	void Dashing();
@@ -168,6 +205,20 @@ public:
 	void LMBDown();
 	void LMBUp();
 
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
+	float LastLeftClickTime;
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+	float ClickInterval = 1.f;
+
+	bool bFirstClick = true;
+	bool LastAttack = false;
+
+	
+	UFUNCTION(BlueprintCallable)
+		void PlaySwingSound();
+	
+
 	bool bRMBDown;
 	void RMBDown();
 	void RMBUp();
@@ -187,12 +238,15 @@ public:
 
 	//공격
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-		bool bAttacking;
+	bool bAttacking;
 
 	void Attack();
 
 	UFUNCTION(BlueprintCallable)
 		void AttackEnd();
+
+	UFUNCTION(BlueprintCallable)
+		void NextAttackAnim();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
 		class UAnimMontage* CombatMontage;
@@ -200,10 +254,20 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 		int CurrentComboCount = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
-		bool bCanCombo = false;
+	//bool bMontageEnd;
+	//float MontageEnd;
 
-	float MontagePosition = 0.f;
+
+	UFUNCTION()
+		void CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	UFUNCTION()
+		void CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UFUNCTION(BlueprintCallable)
+		void ActivateCollision();
+
+	UFUNCTION(BlueprintCallable)
+		void DeactivateCollision();
 
 
 
