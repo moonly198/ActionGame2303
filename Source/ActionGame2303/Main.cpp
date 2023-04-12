@@ -511,7 +511,8 @@ void AMain::NextAttackAnim()
 void AMain::PlaySwingSound()
 {
 	
-		UGameplayStatics::PlaySound2D(this,SwingSound);
+		UGameplayStatics::PlaySound2D(this,SwordSwingSound);
+		UGameplayStatics::PlaySound2D(this,CharSwingSound);
 	
 }
 
@@ -648,10 +649,11 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 		{
 			if (Enemy->HitParticles)
 			{
-				const USkeletalMeshSocket* WeaponSocket = SkeletalMesh->GetSocketByName("Sword_Tip");
+				const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("Sword_Blood");
 				if (WeaponSocket)
 				{
-					FVector SocketLocation = WeaponSocket->GetSocketLocation(SkeletalMesh);
+					//actor(MyProject의Weapon.cpp)는 Skeletalmesh를 받고 char는 GetMesh()
+					FVector SocketLocation = WeaponSocket->GetSocketLocation(GetMesh()); 
 					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Enemy->HitParticles, SocketLocation, FRotator(0.f), false);
 				}
 			}

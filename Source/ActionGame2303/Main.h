@@ -48,8 +48,8 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller")
 		class AMainPlayerController* MainPlayerController;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "SKeletalMesh")
-		class USkeletalMeshComponent* SkeletalMesh;
+	//UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "SKeletalMesh")
+	//	class USkeletalMeshComponent* SkeletalMesh;
 
 	//무기관련
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
@@ -62,7 +62,10 @@ public:
 		class UBoxComponent* CombatCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item | Sound")
-		class USoundCue* SwingSound;
+		class USoundCue* SwordSwingSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item | Sound")
+		class USoundCue* CharSwingSound;
 
 	//공격시 에너미 쪽을 향해 캐릭터 회전
 	float InterpSpeed;
@@ -259,9 +262,9 @@ public:
 
 
 	UFUNCTION()
-		void CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 	UFUNCTION()
-		void CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	void CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	UFUNCTION(BlueprintCallable)
 		void ActivateCollision();
