@@ -58,20 +58,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class USoundCue* HitSound;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item | Combat")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		class UBoxComponent* CombatCollision;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item | Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class USoundCue* SwordSwingSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item | Sound")
-		class USoundCue* CharSwingSound;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		USoundCue* CharSwingSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+		USoundCue* JumpSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+		USoundCue* DashSound;
 
 	//공격시 에너미 쪽을 향해 캐릭터 회전
 	float InterpSpeed;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
-		bool bInterpToEnemy;
+	bool bInterpToEnemy;
+
 	void SetInterpToEnemy(bool Interp);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")

@@ -20,6 +20,7 @@
 #include "Mutant.h"
 #include "Sound/SoundCue.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "EngineUtils.h"
 
 // Sets default values
 AMain::AMain()
@@ -39,6 +40,7 @@ AMain::AMain()
 	//Creat Follow Camera 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+
 	//Attach the camera to the end of the boom and let the boom adjust to match
 	//the controller orientation (카메라를 붐 끝에 부착하고 붐이 컨트롤러 방향에 맞게 조정되도록 한다)
 	FollowCamera->bUsePawnControlRotation = false;
@@ -259,6 +261,7 @@ void AMain::Tick(float DeltaTime)
 
 	if (bInterpToEnemy && CombatTarget)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("CombatToTarget"));
 		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
 		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
 
@@ -366,6 +369,7 @@ void AMain::Dashing()
 		{
 			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
 			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
+			UGameplayStatics::PlaySound2D(this, DashSound);
 			Stamina -= DashStamina;
 			bDashing = true;
 
@@ -451,6 +455,7 @@ void AMain::Attack()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
 		bAttacking = true;
+		SetInterpToEnemy(true);
 		
 		
 		//애니메이션 몽타주 재생하는법
@@ -489,6 +494,7 @@ void AMain::Attack()
 void AMain::AttackEnd()
 {
 	bAttacking = false;
+	SetInterpToEnemy(false);
 	bFirstClick = true;
 	LastAttack = false;
 	CurrentComboCount = 0;
@@ -498,7 +504,6 @@ void AMain::AttackEnd()
 	}
 	
 }
-
 
 void AMain::NextAttackAnim()
 {
@@ -564,9 +569,15 @@ void AMain::Jump()
 	
 	if (bDashing || bAttacking)
 		return;
-
-	Super::Jump();
 	
+	Super::Jump();
+
+	if (!this->GetMovementComponent()->IsFalling())
+	{
+		
+		UGameplayStatics::PlaySound2D(this, JumpSound);
+
+	}
 }
 
 

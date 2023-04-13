@@ -27,6 +27,24 @@ public:
 	// Sets default values for this character's properties
 	AMutant();
 
+	/*
+	//공격시 에너미 쪽을 향해 캐릭터 회전
+	float InterpSpeed;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+		bool bInterpToEnemy;
+	void SetInterpToEnemy(bool Interp);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AI")
+		class AMain* CombatTarget;
+
+	FORCEINLINE void SetCombatTarget(AMain* Target) { CombatTarget = Target; }
+
+	FRotator GetLookAtRotationYaw(FVector Target);
+	*/
+
+
+
 	bool bHasValidTarget;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")

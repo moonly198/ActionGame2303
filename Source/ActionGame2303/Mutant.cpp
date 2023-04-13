@@ -15,6 +15,7 @@
 #include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
 #include "MainPlayerController.h"
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 AMutant::AMutant()
@@ -43,6 +44,9 @@ AMutant::AMutant()
 	Damage = 10.f;
 
 	bHasValidTarget = false;
+
+	//InterpSpeed = 15.f;
+	//bInterpToEnemy = false;
 
 }
 
@@ -81,9 +85,30 @@ void AMutant::BeginPlay()
 void AMutant::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	/*
+	if (bInterpToEnemy && CombatTarget)
+	{
+		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
+		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
 
+		SetActorRotation(InterpRotation);
+	}
+	*/
 }
 
+/*
+FRotator AMutant::GetLookAtRotationYaw(FVector Target)
+{
+	FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Target);
+	FRotator LookAtRotationYaw(0.f, LookAtRotation.Yaw, 0.f);
+	return LookAtRotationYaw;
+}
+
+void AMutant::SetInterpToEnemy(bool Interp)
+{
+	bInterpToEnemy = Interp;
+}
+*/
 // Called to bind functionality to input
 void AMutant::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -144,6 +169,7 @@ void AMutant::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponen
 				Main->SetCombatTarget(this);
 				Main->SetHasCombatTarget(true);
 
+
 				CombatTarget = Main;
 				bOverlappingCombatSphere = true;
 
@@ -161,14 +187,19 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 			if (Main)
 			{
 				bOverlappingCombatSphere = false;
-				MoveToTarget(Main);
-				CombatTarget = nullptr;
-
+				if (EnemyMovementStatus != EEnemyMovementStatus::EMS_Attacking)
+				{
+					MoveToTarget(Main);
+					CombatTarget = nullptr;
+				}
+				
+				
 				if (Main->CombatTarget == this)
 				{
 					Main->SetCombatTarget(nullptr);
 					Main->bHasCombatTarget = false;
 				}
+				
 				//SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
 				//EnemyAnim_BP에서 MoveToTarget함수 호출 
 			}
@@ -269,12 +300,51 @@ void AMutant::Attack()
 		}
 		if (!bAttacking)
 		{
+			
 			bAttacking = true;
+			//SetInterpToEnemy(true);
+
 			UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
+			AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+			FVector MainLocation = Main->GetActorLocation();
+
+			FVector MutantLocation = this->GetActorLocation();
+
+			float DistanceToMain = FVector::Distance(MainLocation, MutantLocation);
+
 			if (AnimInstance)
 			{
-				AnimInstance->Montage_Play(CombatMontage, 1.35f);
-				AnimInstance->Montage_JumpToSection(FName("Attack"), CombatMontage);
+				
+				int32 Section = FMath::RandRange(0, 2);
+				switch (Section)
+				{
+					case 0:
+						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Punch"), CombatMontage);
+						break;
+
+					case 1:
+						AnimInstance->Montage_Play(CombatMontage,1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Swiping"), CombatMontage);
+						break;
+					case 2:
+						if (DistanceToMain <= 300)
+						{
+							AnimInstance->Montage_Play(CombatMontage, 1.f);
+							AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
+						}
+						
+						break;
+						/*
+					case 3:
+						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_JumpAttack"), CombatMontage);
+						break;
+						*/
+					default:
+						;
+				}
 			}
 		}
 	}
@@ -283,5 +353,10 @@ void AMutant::Attack()
 void AMutant::AttackEnd()
 {
 	bAttacking = false;
+	if(bOverlappingCombatSphere)
+	{
+		Attack();
+	}
+	//SetInterpToEnemy(false);
 
 }
