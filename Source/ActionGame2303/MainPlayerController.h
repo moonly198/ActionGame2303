@@ -24,10 +24,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		UUserWidget* HUDOverlay;
 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget>WEnemyHealthBar;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* EnemyHealthBar;
+
+	bool bEnemyHealthBarVisible;
+
+	void DisplayEnemyHealthBar();
+	void RemoveEnemyHealthBar();
+
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		TSubclassOf<class UUserWidget>WPauseMenu;
 
-	//위젯을 생선한 후 위젯을 담을 변수
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		UUserWidget* PauseMenu;
 

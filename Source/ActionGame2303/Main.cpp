@@ -21,6 +21,7 @@
 #include "Sound/SoundCue.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "EngineUtils.h"
+#include "TimerManager.h"
 
 // Sets default values
 AMain::AMain()
@@ -49,8 +50,8 @@ AMain::AMain()
 	BaseLookUpRate = 65.f;
 
 
-	CombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("CombatCollision"));
-	CombatCollision->SetupAttachment(GetMesh(), FName("Sword_Strike"));
+	SwordCombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("SwordCombatCollision"));
+	SwordCombatCollision->SetupAttachment(GetMesh(), FName("Sword_Strike"));
 
 	//Don't rotate when the controller rotates.
 	//Let that just affect the camera.
@@ -66,6 +67,16 @@ AMain::AMain()
 
 	MovementStatus = EMovementStatus::EMS_Normal;
 	StaminaStatus = EStaminaStatus::ESS_Normal;
+
+
+	
+	MaxHealth = 1000.f;
+	Health = 800.f;
+	
+	MaxStamina = 1000.f;
+	Stamina = 800.f;
+
+	AttackReCoverStaminaTime = 1.f;
 
 	StaminaDrainRate = 100.f; //스태미나 감소하는 비율
 	MinSprintStamina = 300.f; //스태미나 경고 뜨는 선
@@ -105,13 +116,13 @@ void AMain::BeginPlay()
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
 
-	CombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
-	CombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
+	SwordCombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
+	SwordCombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
 
-	CombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
-	CombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	CombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+	SwordCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SwordCombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+	SwordCombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	SwordCombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
 
 	
 }
@@ -120,115 +131,8 @@ void AMain::BeginPlay()
 void AMain::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
-	float DeltaStamina = StaminaDrainRate * DeltaTime;
-	//UE_LOG(LogTemp, Warning, TEXT("%f"),Stamina);
-
-	switch (StaminaStatus)
-	{
-		case EStaminaStatus::ESS_Normal:
-			if ((bShiftKeyDown || bDashing )&& !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 BelowMinimum으로 상태가 변함
-			{
-				if (Stamina - DeltaStamina <= MinSprintStamina)
-				{
-					SetStaminaStatus(EStaminaStatus::ESS_BelowMinimum);
-					Stamina -= DeltaStamina;
-				}
-				else
-				{
-					Stamina -= DeltaStamina;
-				}
-				SetMovementStatus(EMovementStatus::EMS_Sprinting);
-			}
-			else if(!bShiftKeyDown || !bDashing || bCtrlKeyDown) //shift Key up 혹은 대쉬 안할때
-			{
-				if (Stamina + DeltaStamina >= MaxStamina)
-				{
-					Stamina = MaxStamina;
-				}
-				else
-				{
-					Stamina += DeltaStamina;
-				}
-				if(!bCtrlKeyDown)
-					SetMovementStatus(EMovementStatus::EMS_Normal);
-				else
-					SetMovementStatus(EMovementStatus::EMS_Walking);
-			}
-			break;
-
-		case EStaminaStatus::ESS_BelowMinimum:
-			if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
-			{
-				if (Stamina - DeltaStamina <= 0.f)
-				{
-					SetStaminaStatus(EStaminaStatus::ESS_Exhausted);
-					Stamina = 0;
-					SetMovementStatus(EMovementStatus::EMS_Normal);
-				}
-				else
-				{
-					Stamina -= DeltaStamina;
-					SetMovementStatus(EMovementStatus::EMS_Sprinting);
-				}
-				//SetMovementStatus(EMovementStatus::EMS_Normal);
-			}
-			else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown) // shift Key up
-			{
-				if (Stamina + DeltaStamina >= MinSprintStamina)
-				{
-					
-					SetStaminaStatus(EStaminaStatus::ESS_Normal);
-					Stamina += DeltaStamina;
-				}
-				else
-				{
-					Stamina += DeltaStamina;
-				}
-			}
-
-			break;
-
-		case EStaminaStatus::ESS_Exhausted:
-			if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
-			{
-				Stamina = 0.f;
-			}
-			else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown)// shift Key up
-			{
-				SetStaminaStatus(EStaminaStatus::ESS_ExhaustedRecovering);
-				Stamina += DeltaStamina;
-			}
-
-			if(!bCtrlKeyDown)
-				SetMovementStatus(EMovementStatus::EMS_Normal);
-			else
-				SetMovementStatus(EMovementStatus::EMS_Walking);
-			break;
-
-		case EStaminaStatus::ESS_ExhaustedRecovering:
-			if (Stamina + DeltaStamina >= MinSprintStamina)
-			{
-				SetStaminaStatus(EStaminaStatus::ESS_Normal);
-				Stamina += DeltaStamina;
-
-			}
-			else
-			{
-				Stamina += DeltaStamina;
-			}
-
-			if (!bCtrlKeyDown)
-				SetMovementStatus(EMovementStatus::EMS_Normal);
-			else
-				SetMovementStatus(EMovementStatus::EMS_Walking);
-
-			break;
-
-		default:
-			;
-
-	}
 
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
@@ -248,7 +152,8 @@ void AMain::Tick(float DeltaTime)
 
 	if (bAttacking)
 	{
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		
+		//UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		//MontageEnd = AnimInstance->Montage_GetPosition(CombatMontage);
 		ShiftKeyUp();
 		/*
@@ -258,6 +163,15 @@ void AMain::Tick(float DeltaTime)
 			bMontageEnd = false;
 		*/
 	}
+	if (bAttacking)
+		GetWorld()->GetTimerManager().SetTimer(StaminaDelayTimer, 
+			FTimerDelegate::CreateUObject(this, &AMain::RcoveringStamina,DeltaTime),
+			AttackReCoverStaminaTime,false, AttackReCoverStaminaTime);
+	else
+	{
+		RcoveringStamina(DeltaTime);
+	}
+	
 
 	if (bInterpToEnemy && CombatTarget)
 	{
@@ -276,7 +190,11 @@ FRotator AMain::GetLookAtRotationYaw(FVector Target)
 	FRotator LookAtRotationYaw(0.f, LookAtRotation.Yaw, 0.f);
 	return LookAtRotationYaw;
 }
-	
+
+void AMain::SetInterpToEnemy(bool Interp)
+{
+	bInterpToEnemy = Interp;
+}
 
 // Called to bind functionality to input
 void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -384,20 +302,6 @@ void AMain::Dashing()
 	
 }
 
-
-void AMain::DecrementHealth(float Damage)
-{
-	if (Health - Damage <= 0.f)
-	{
-		Health -= Damage;
-		Die();
-	}
-	else
-	{
-		Health -= Damage;
-	}
-}
-
 void AMain::TargetingMode()
 {
 
@@ -451,8 +355,13 @@ void AMain::LMBUp()
 void AMain::Attack()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
-	if (!bAttacking)
+	if (!bAttacking && MovementStatus != EMovementStatus::EMS_Dead)
 	{
+		//AttackReCoverStaminaTime후 스태미너회복
+		//GetWorld()->GetTimerManager().SetTimer(StaminaDelayTimer, FTimerDelegate::CreateUObject(this, &AMain::RcoveringStamina, GetWorld()->DeltaTimeSeconds)
+		//	, 1.f, false, AttackReCoverStaminaTime);
+		Stamina -= 100.f;
+		
 		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
 		bAttacking = true;
 		SetInterpToEnemy(true);
@@ -521,15 +430,62 @@ void AMain::PlaySwingSound()
 	
 }
 
-void AMain::SetInterpToEnemy(bool Interp)
+void AMain::DecrementHealth(float Amount)
 {
-	bInterpToEnemy = Interp;
+	/*
+	if (Health - Damage <= 0.f)
+	{
+		Health -= Damage;
+		Die();
+	}
+	else
+	{
+		Health -= Damage;
+	}
+	*/
 }
 
+float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (Health - DamageAmount <= 0.f)
+	{
+		Health -= DamageAmount;
+		Die();
+		if (DamageCauser)
+		{
+			AMutant* Enemy = Cast <AMutant>(DamageCauser);
+			if (Enemy)
+			{
+				Enemy->bHasValidTarget = false;
+			}
+		}
+	}
+	else
+	{
+		Health -= DamageAmount;
+	}
+
+	return DamageAmount;
+}
 
 void AMain::Die()
 {
+	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && CombatMontage)
+	{
+		AnimInstance->Montage_Play(CombatMontage, 1.0f);
+		AnimInstance->Montage_JumpToSection(FName("Death"));
+
+	}
+	SetMovementStatus(EMovementStatus::EMS_Dead);
+}
+
+void AMain::DeathEnd()
+{
+	GetMesh()->bPauseAnims = true;
+	GetMesh()->bNoSkeletonUpdate = true;
 }
 
 void AMain::RMBDown()
@@ -557,9 +513,6 @@ void AMain::ESCUp()
 	bESCDown = false;
 }
 
-
-
-
 void AMain::Jump()
 {
 	
@@ -580,7 +533,135 @@ void AMain::Jump()
 	}
 }
 
+void AMain::RcoveringStamina(float Time)
+{
+	
+	//float DeltaStamina = StaminaDrainRate * GetWorld()->DeltaTimeSeconds;
+	float DeltaStamina = StaminaDrainRate * Time;
+	
+	//UE_LOG(LogTemp, Warning, TEXT("%f"),Stamina);
+	
+	switch (StaminaStatus)
+	{
+	case EStaminaStatus::ESS_Normal:
+		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 BelowMinimum으로 상태가 변함
+		{
+			if (Stamina - DeltaStamina <= MinSprintStamina)
+			{
+				SetStaminaStatus(EStaminaStatus::ESS_BelowMinimum);
+				Stamina -= DeltaStamina;
+			}
+			else
+			{
+				Stamina -= DeltaStamina;
+			}
 
+			if (bMovingForward || bMovingRight)
+			{
+				SetMovementStatus(EMovementStatus::EMS_Sprinting);
+			}
+			else
+			{
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			}
+		}
+		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown) //shift Key up 혹은 대쉬 안할때
+		{
+			if (Stamina + DeltaStamina >= MaxStamina)
+			{
+				Stamina = MaxStamina;
+			}
+			else
+			{
+				Stamina += DeltaStamina;
+			}
+			if (!bCtrlKeyDown)
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			else
+				SetMovementStatus(EMovementStatus::EMS_Walking);
+		}
+		break;
+
+	case EStaminaStatus::ESS_BelowMinimum:
+		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
+		{
+			if (Stamina - DeltaStamina <= 0.f)
+			{
+				SetStaminaStatus(EStaminaStatus::ESS_Exhausted);
+				Stamina = 0;
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			}
+			else
+			{
+				Stamina -= DeltaStamina;
+				if (bMovingForward || bMovingRight)
+				{
+					SetMovementStatus(EMovementStatus::EMS_Sprinting);
+				}
+				else
+				{
+					SetMovementStatus(EMovementStatus::EMS_Normal);
+				}
+			}
+
+		}
+		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown) // shift Key up
+		{
+			if (Stamina + DeltaStamina >= MinSprintStamina)
+			{
+
+				SetStaminaStatus(EStaminaStatus::ESS_Normal);
+				Stamina += DeltaStamina;
+			}
+			else
+			{
+				Stamina += DeltaStamina;
+			}
+		}
+
+		break;
+
+	case EStaminaStatus::ESS_Exhausted:
+		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
+		{
+			Stamina = 0.f;
+		}
+		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown)// shift Key up
+		{
+			SetStaminaStatus(EStaminaStatus::ESS_ExhaustedRecovering);
+			Stamina += DeltaStamina;
+		}
+
+		if (!bCtrlKeyDown)
+			SetMovementStatus(EMovementStatus::EMS_Normal);
+		else
+			SetMovementStatus(EMovementStatus::EMS_Walking);
+		break;
+
+	case EStaminaStatus::ESS_ExhaustedRecovering:
+		if (Stamina + DeltaStamina >= MinSprintStamina)
+		{
+			SetStaminaStatus(EStaminaStatus::ESS_Normal);
+			Stamina += DeltaStamina;
+
+		}
+		else
+		{
+			Stamina += DeltaStamina;
+		}
+
+		if (!bCtrlKeyDown)
+			SetMovementStatus(EMovementStatus::EMS_Normal);
+		else
+			SetMovementStatus(EMovementStatus::EMS_Walking);
+
+		break;
+
+	default:
+		;
+
+	}
+}
 
 bool AMain::CanMove(float Value)
 {
@@ -612,6 +693,7 @@ void AMain::MoveForward(float Value)
 
 void AMain::MoveRight(float Value)
 {
+	bMovingRight = false;
 	if (CanMove(Value))
 	{
 		//옆으로 가는 방향 설정 (const는 바꾸지 않을 것에 사용)
@@ -621,7 +703,7 @@ void AMain::MoveRight(float Value)
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		AddMovementInput(Direction, Value);
 
-
+		bMovingRight = true;
 	}
 }
 
@@ -672,6 +754,10 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 			{
 				UGameplayStatics::PlaySound2D(this, Enemy->HitSound);
 			}
+			if (DamageTypeClass)
+			{
+				UGameplayStatics::ApplyDamage(Enemy, Damage, WeaponInstigator, this, DamageTypeClass);
+			}
 
 		}
 	}
@@ -684,11 +770,10 @@ void AMain::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor*
 
 void AMain::ActivateCollision()
 {
-	CombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	SwordCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 }
-
 
 void AMain::DeactivateCollision()
 {
-	CombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SwordCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

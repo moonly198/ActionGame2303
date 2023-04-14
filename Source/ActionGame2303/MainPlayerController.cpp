@@ -17,6 +17,21 @@ void AMainPlayerController::BeginPlay()
 			HUDOverlay->SetVisibility(ESlateVisibility::Visible); // 가시성 설정
 		}
 	}
+
+
+	if (WEnemyHealthBar)
+	{
+		EnemyHealthBar = CreateWidget<UUserWidget>(this, WEnemyHealthBar);
+		if (EnemyHealthBar)
+		{
+			EnemyHealthBar->AddToViewport();
+			EnemyHealthBar->SetVisibility(ESlateVisibility::Hidden);
+		}
+
+		//FVector2D Alignment(0.f, 0.f);
+		//EnemyHealthBar->SetAlignmentInViewport(Alignment);
+	}
+
 	
 	if (WPauseMenu)
 	{
@@ -29,6 +44,25 @@ void AMainPlayerController::BeginPlay()
 		}
 	}
 }
+
+void AMainPlayerController::DisplayEnemyHealthBar()
+{
+	if (EnemyHealthBar)
+	{
+		bEnemyHealthBarVisible = true;
+		EnemyHealthBar->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+void AMainPlayerController::RemoveEnemyHealthBar()
+{
+	if (EnemyHealthBar)
+	{
+		bEnemyHealthBarVisible = false;
+		EnemyHealthBar->SetVisibility(ESlateVisibility::Hidden);
+	}
+}
+
 
 void AMainPlayerController::DisplayPauseMenu_Implementation()
 {

@@ -39,9 +39,20 @@ AMutant::AMutant()
 
 	bOverlappingCombatSphere = false;
 
-	Health = 75.f;
-	MaxHealth = 100.f;
+	Health = 1000.f;
+	MaxHealth = 1000.f;
+
+	Stamina = 500.f;
+	MaxStamina = 500.f;
+
 	Damage = 10.f;
+
+	AttackMinTime = 0.5f;
+	AttackMaxTime = 3.5f;
+
+	EnemyMovementStatus = EEnemyMovementStatus::EMS_Idle;
+
+	DeathDelay = 1.f;
 
 	bHasValidTarget = false;
 
@@ -123,6 +134,11 @@ void AMutant::AgroSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 		AMain* Main = Cast<AMain>(OtherActor);
 		if (Main)
 		{
+			// 적 체력바
+			if (Main->MainPlayerController)
+			{
+				Main->MainPlayerController->DisplayEnemyHealthBar();
+			}
 
 			MoveToTarget(Main);
 		}
@@ -138,11 +154,17 @@ void AMutant::AgroSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 			if (Main)
 			{
 				bHasValidTarget = false;
+				Main->SetHasCombatTarget(false);
+				// 적 체력바
+				if (Main->MainPlayerController)
+				{
+					Main->MainPlayerController->RemoveEnemyHealthBar();
+				}
+				
 				if (Main->CombatTarget == this)
 				{
 					Main->SetCombatTarget(nullptr);
 				}
-				Main->SetHasCombatTarget(false);
 
 				SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Idle);
 				if (AIController)
@@ -165,14 +187,14 @@ void AMutant::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponen
 
 				bHasValidTarget = true;
 
-				Attack();
 				Main->SetCombatTarget(this);
 				Main->SetHasCombatTarget(true);
 
-
+				
 				CombatTarget = Main;
 				bOverlappingCombatSphere = true;
 
+				Attack();
 			}
 		}
 	}
@@ -192,14 +214,8 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 					MoveToTarget(Main);
 					CombatTarget = nullptr;
 				}
-				
-				
-				if (Main->CombatTarget == this)
-				{
-					Main->SetCombatTarget(nullptr);
-					Main->bHasCombatTarget = false;
-				}
-				
+				//오버랩 끝날시 공격 타이머 리셋
+				GetWorldTimerManager().ClearTimer(AttackTimer);
 				//SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
 				//EnemyAnim_BP에서 MoveToTarget함수 호출 
 			}
@@ -209,6 +225,7 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 
 void AMutant::MoveToTarget(AMain* Target)
 {
+	UE_LOG(LogTemp, Warning, TEXT("MoveToTarget"));
 	SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
 
 	if (AIController)
@@ -262,6 +279,10 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 			{
 				UGameplayStatics::PlaySound2D(this, Main->HitSound);
 			}
+			if (DamageTypeClass)
+			{
+				UGameplayStatics::ApplyDamage(Main, Damage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TameDamage();
+			}
 
 		}
 	}
@@ -291,7 +312,7 @@ void AMutant::DeactivateCollision()
 
 void AMutant::Attack()
 {
-	//if (bHasValidTarget)
+	if (Alive() && bHasValidTarget)
 	{
 		if (AIController)
 		{
@@ -355,8 +376,65 @@ void AMutant::AttackEnd()
 	bAttacking = false;
 	if(bOverlappingCombatSphere)
 	{
-		Attack();
+		//AttackTime은 AttackMinTime과 AttackMaxTime 사이의 랜덤 숫자
+		float AttackTime = FMath::FRandRange(AttackMinTime, AttackMaxTime);
+		//AttackTime 후 에 Attack()함수 호출
+		GetWorldTimerManager().SetTimer(AttackTimer, this, &AMutant::Attack, AttackTime);
 	}
 	//SetInterpToEnemy(false);
 
 }
+
+float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
+{
+	if (Health - DamageAmount <= 0.f)
+	{
+		Health -= DamageAmount;
+		Die();
+	}
+	else
+	{
+		Health -= DamageAmount;
+	}
+
+	return DamageAmount;
+}
+
+void AMutant::Die()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && CombatMontage)
+	{
+		AnimInstance->Montage_Play(CombatMontage, 1.35f);
+		AnimInstance->Montage_JumpToSection(FName("MutantDie"), CombatMontage);
+
+	}
+	SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Dead);
+
+	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AgroSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CombatSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+
+void AMutant::DeathEnd()
+{
+	GetMesh()->bPauseAnims = true;
+	GetMesh()->bNoSkeletonUpdate = true;
+
+	//DeathDelay 시간 후 Disappear함수 호출
+	GetWorldTimerManager().SetTimer(DeathTimer, this, &AMutant::Disappear, DeathDelay);
+}
+
+bool AMutant::Alive()
+{
+	return GetEnemyMovementStatus() != EEnemyMovementStatus::EMS_Dead;
+}
+
+void AMutant::Disappear()
+{
+	Destroy();
+}
+

@@ -12,6 +12,8 @@ enum class EMovementStatus : uint8
 	EMS_Normal UMETA(DisplayName = "Normal"),
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
 	EMS_Walking UMETA(DisplayName = "Walking"),
+	EMS_Dead UMETA(DisplayName = "Dead"),
+
 
 	EMS_MAX UMETA(DisplayName = "DefaultMAX")
 };
@@ -48,9 +50,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller")
 		class AMainPlayerController* MainPlayerController;
 
-	//UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "SKeletalMesh")
-	//	class USkeletalMeshComponent* SkeletalMesh;
-
 	//무기관련
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UParticleSystem* HitParticles;
@@ -59,7 +58,10 @@ public:
 		class USoundCue* HitSound;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-		class UBoxComponent* CombatCollision;
+		class UBoxComponent* SwordCombatCollision;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float Damage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class USoundCue* SwordSwingSound;
@@ -146,16 +148,16 @@ public:
 	*/
 
 	UPROPERTY(EditAnywhere,BlueprintReadOnly, Category = "Player Stats")
-		float MaxHealth = 1000.f;
+		float MaxHealth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
-		float Health = 800.f;
+		float Health;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
-		float MaxStamina = 1000.f;
+		float MaxStamina;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player Stats")
-		float Stamina = 800.f;
+		float Stamina;
 
 protected:
 	// Called when the game starts or when spawned
@@ -172,13 +174,13 @@ public:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 
+	bool bMovingForward;
+	bool bMovingRight;
+
 	//가로축 돌리기(왼쪽 오른쪽)
 	void Turn(float Value);
 	//세로축 돌리기(위 아래)
 	void LookUp(float Value);
-
-	bool bMovingForward;
-	bool bMovingRight;
 
 	bool CanMove(float Value);
 
@@ -188,11 +190,15 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
+	//스태미나 회복함수
+	void RcoveringStamina(float Time);
+
 	//점프
-	void Jump();
+	virtual void Jump() override;
 
 	//구르기, 대쉬
 	void Dashing();
+
 	UPROPERTY(EditAnywhere)
 	float DashDistance = 6000.f;
 	
@@ -224,11 +230,6 @@ public:
 	bool bFirstClick = true;
 	bool LastAttack = false;
 
-	
-	UFUNCTION(BlueprintCallable)
-		void PlaySwingSound();
-	
-
 	bool bRMBDown;
 	void RMBDown();
 	void RMBUp();
@@ -243,8 +244,12 @@ public:
 	void TravelMode();
 
 	//공격 받았을시
-	void DecrementHealth(float Damage);
+	void DecrementHealth(float Amount);
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	void Die();
+
+	UFUNCTION(BlueprintCallable)
+		void DeathEnd();
 
 	//공격
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
@@ -258,11 +263,20 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void NextAttackAnim();
 
+	UFUNCTION(BlueprintCallable)
+		void PlaySwingSound();
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
 		class UAnimMontage* CombatMontage;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 		int CurrentComboCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float AttackReCoverStaminaTime;
+
+	FTimerHandle StaminaDelayTimer;
+	//FTimerManager StaminaDelayTimer;
 
 	//bool bMontageEnd;
 	//float MontageEnd;
@@ -280,6 +294,14 @@ public:
 		void DeactivateCollision();
 
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		TSubclassOf<UDamageType> DamageTypeClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		AController* WeaponInstigator;
+
+	//WeaponInstigator AController에 경험치등 여러 정보를 저장 가능하게함
+	FORCEINLINE void SetInstigator(AController* Inst) { WeaponInstigator = Inst; }
 
 
 };
