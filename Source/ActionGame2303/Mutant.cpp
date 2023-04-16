@@ -45,7 +45,7 @@ AMutant::AMutant()
 	Stamina = 500.f;
 	MaxStamina = 500.f;
 
-	Damage = 10.f;
+	EnemyHealthDamage = 10.f;
 
 	AttackMinTime = 0.5f;
 	AttackMaxTime = 3.5f;
@@ -135,6 +135,11 @@ void AMutant::AgroSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 		if (Main)
 		{
 			// 적 체력바
+			CombatTarget = Main;
+			bHasValidTarget = true;
+			Main->SetHasCombatTarget(true);
+			Main->SetCombatTarget(this);
+
 			if (Main->MainPlayerController)
 			{
 				Main->MainPlayerController->DisplayEnemyHealthBar();
@@ -184,14 +189,7 @@ void AMutant::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponen
 		{
 			if (Main)
 			{
-
-				bHasValidTarget = true;
-
-				Main->SetCombatTarget(this);
-				Main->SetHasCombatTarget(true);
-
 				
-				CombatTarget = Main;
 				bOverlappingCombatSphere = true;
 
 				Attack();
@@ -216,8 +214,10 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 				}
 				//오버랩 끝날시 공격 타이머 리셋
 				GetWorldTimerManager().ClearTimer(AttackTimer);
+				
 				//SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
 				//EnemyAnim_BP에서 MoveToTarget함수 호출 
+				//Attack();
 			}
 		}
 	}
@@ -281,9 +281,9 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 			}
 			if (DamageTypeClass)
 			{
-				UGameplayStatics::ApplyDamage(Main, Damage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TameDamage();
+				UGameplayStatics::ApplyDamage(Main, EnemyHealthDamage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TakeDamage();
 			}
-
+			
 		}
 	}
 }
@@ -374,6 +374,13 @@ void AMutant::Attack()
 void AMutant::AttackEnd()
 {
 	bAttacking = false;
+	//CombatSphereOverlapEnd 가 실행이 됬는데 EMS_Attacking 일 경우에는 AttackEnd()에서 한번더 검사
+	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Attacking)
+	{
+		AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
+		MoveToTarget(Main);
+	}
+
 	if(bOverlappingCombatSphere)
 	{
 		//AttackTime은 AttackMinTime과 AttackMaxTime 사이의 랜덤 숫자
@@ -381,12 +388,16 @@ void AMutant::AttackEnd()
 		//AttackTime 후 에 Attack()함수 호출
 		GetWorldTimerManager().SetTimer(AttackTimer, this, &AMutant::Attack, AttackTime);
 	}
+	
 	//SetInterpToEnemy(false);
 
 }
 
 float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
 {
+
+	AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+	DamageAmount = Main->HealthDamage;
 	if (Health - DamageAmount <= 0.f)
 	{
 		Health -= DamageAmount;
@@ -395,9 +406,37 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	else
 	{
 		Health -= DamageAmount;
+		
+	}
+	
+	DamageAmount = Main->StaminaDamage;
+	//Stamina
+	if (Stamina - DamageAmount <= 0.f)
+	{
+		Stamina = 0.f;
+	}
+	else
+	{
+		Stamina -= DamageAmount;
+	}
+	
+	DamageAmount = Main->MaxStaminaDamage;
+	//MaxStamina
+	if (MaxStamina - DamageAmount <= 0.f)
+	{
+		MaxStamina = 0.f;
+	}
+	else
+	{
+		MaxStamina -= DamageAmount;
 	}
 
 	return DamageAmount;
+}
+
+void AMutant::DamagedStamina()
+{
+	
 }
 
 void AMutant::Die()

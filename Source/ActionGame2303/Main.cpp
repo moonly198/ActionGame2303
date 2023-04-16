@@ -22,6 +22,7 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
+#include "HealthDamageType.h"
 
 // Sets default values
 AMain::AMain()
@@ -133,11 +134,23 @@ void AMain::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
+	if ( MovementStatus != EMovementStatus::EMS_Stun)
+	{
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && StunMontage)
+		{
+			if (AnimInstance->Montage_IsPlaying(StunMontage))
+			{
+				AnimInstance->Montage_Stop(0.3f, StunMontage);
+				bStunned = false;
+			}
+		}
+	}
+	
 
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
 	//대쉬 몽타주가 끝날때까지 달리지 못함
-	
 	if (bDashing)
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -151,31 +164,15 @@ void AMain::Tick(float DeltaTime)
 	}
 
 	if (bAttacking)
-	{
-		
-		//UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		//MontageEnd = AnimInstance->Montage_GetPosition(CombatMontage);
-		ShiftKeyUp();
-		/*
-		if (!AnimInstance->Montage_IsPlaying(CombatMontage))
-			bMontageEnd = true;
-		else
-			bMontageEnd = false;
-		*/
-	}
-	if (bAttacking)
-		GetWorld()->GetTimerManager().SetTimer(StaminaDelayTimer, 
-			FTimerDelegate::CreateUObject(this, &AMain::RcoveringStamina,DeltaTime),
-			AttackReCoverStaminaTime,false, AttackReCoverStaminaTime);
+		StaminaDelay(DeltaTime);
 	else
-	{
 		RcoveringStamina(DeltaTime);
-	}
+	
 	
 
 	if (bInterpToEnemy && CombatTarget)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CombatToTarget"));
+		//UE_LOG(LogTemp, Warning, TEXT("CombatToTarget"));
 		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
 		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
 
@@ -283,7 +280,7 @@ void AMain::Dashing()
 	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
 	if (MainAnimInstance != nullptr)
 	{
-		if ((!bDashing) && !(MainAnimInstance->bIsInAir) && (Stamina >= DashStamina) && (!bAttacking)) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
+		if ((!bDashing) && !(MainAnimInstance->bIsInAir) && (Stamina >= DashStamina) && (!bAttacking) && !bStunned) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
 		{
 			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
 			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
@@ -300,6 +297,27 @@ void AMain::Dashing()
 		}
 	}
 	
+}
+
+void AMain::Stunned()
+{
+	MovementStatus = EMovementStatus::EMS_Stun;
+	bAttacking = false;
+	UE_LOG(LogTemp, Warning, TEXT("Stun!"));
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	class UMainAnimInstance* MainAnimInstance;
+	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
+	if (MainAnimInstance != nullptr)
+	{
+		UGameplayStatics::PlaySound2D(this, StunSound);
+		bStunned = true;
+
+		if (AnimInstance && StunMontage)
+		{
+				AnimInstance->Montage_Play(StunMontage, 1);
+				AnimInstance->Montage_JumpToSection(FName("Stun_Idle"),StunMontage);
+		}
+	}
 }
 
 void AMain::TargetingMode()
@@ -321,29 +339,28 @@ void AMain::LMBDown()
 	
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	
-	if (bFirstClick)
+	if (!bDashing && !bStunned)
 	{
-		Attack();
-		bFirstClick = false;
-		LastLeftClickTime = CurrentTime;
-		
+		if (bFirstClick)
+		{
+			Attack();
+			bFirstClick = false;
+			LastLeftClickTime = CurrentTime;
+
+		}
+		else if ((!bLMBDown) && (CurrentTime - LastLeftClickTime < ClickInterval) && !LastAttack)
+		{
+			// Double click
+
+			NextAttackAnim();
+			LastLeftClickTime = CurrentTime;
+		}
+		else
+		{
+			// Single click
+			Attack();
+		}
 	}
-	else if ((!bLMBDown)&&(CurrentTime - LastLeftClickTime < ClickInterval) && !LastAttack)// && !bMontageEnd)
-	{
-		// Double click
-		
-		NextAttackAnim();
-		LastLeftClickTime = CurrentTime;
-	}
-	else
-	{
-		// Single click
-		Attack();
-	}
-	
-	
-	
 	bLMBDown = true;
 }
 
@@ -355,34 +372,36 @@ void AMain::LMBUp()
 void AMain::Attack()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
-	if (!bAttacking && MovementStatus != EMovementStatus::EMS_Dead)
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (!bAttacking && MovementStatus != EMovementStatus::EMS_Dead && Stamina > 0.f)
 	{
-		//AttackReCoverStaminaTime후 스태미너회복
-		//GetWorld()->GetTimerManager().SetTimer(StaminaDelayTimer, FTimerDelegate::CreateUObject(this, &AMain::RcoveringStamina, GetWorld()->DeltaTimeSeconds)
-		//	, 1.f, false, AttackReCoverStaminaTime);
-		Stamina -= 100.f;
-		
-		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
+		Stamina -= AttackStamina; //공격시 스태미너 AttackStamina만큼 - 하기
 		bAttacking = true;
 		SetInterpToEnemy(true);
+
 		
+		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
 		
+	
 		//애니메이션 몽타주 재생하는법
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		
 		if (AnimInstance && CombatMontage)
 		{
+			const FVector ForwardDir = this->GetActorRotation().Vector(); // 캐릭터가 가고있는 앞쪽방향
 			if (CurrentComboCount == 0)
 			{
+				
 				AnimInstance->Montage_Play(CombatMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("Attack_1"), CombatMontage);
-				
-				
+
+				LaunchCharacter(ForwardDir * AttackDistance, true, false);  //AttackDistance만큼 앞으로
 			}
 			else if (CurrentComboCount == 1)
 			{
 				
 				AnimInstance->Montage_Play(CombatMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("Attack_2"), CombatMontage);
+				LaunchCharacter(ForwardDir * AttackDistance, true, false);
 				
 			}
 			else if (CurrentComboCount == 2)
@@ -390,14 +409,41 @@ void AMain::Attack()
 				
 				AnimInstance->Montage_Play(CombatMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
+				LaunchCharacter(ForwardDir * AttackDistance, true, false);
 				
 				LastAttack = true;
 			}
-
-			
-				
 		}
 	}
+
+	
+	/* 현재 캐릭터가 바라보는 방향으로 회전
+	const FRotator Rotation = Controller->GetControlRotation();
+	const FRotator YawRotation(0.f, Rotation.Yaw, 0.f);
+
+	const FVector DirectionY1 = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y); //오른쪽
+	const FVector DirectionY2 = -FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y); //왼쪽
+
+	const FVector DirectionX1 = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X); //앞
+	const FVector DirectionX2 = -FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);  //뒤
+
+	if(MainPlayerController->IsInputKeyDown(EKeys::D))
+	{
+		SetActorRotation(DirectionY1.Rotation());
+	}
+	else if (MainPlayerController->IsInputKeyDown(EKeys::A))
+	{
+		SetActorRotation(DirectionY2.Rotation());
+	}
+	if (MainPlayerController->IsInputKeyDown(EKeys::W))
+	{
+		SetActorRotation(DirectionX1.Rotation());
+	}
+	else if (MainPlayerController->IsInputKeyDown(EKeys::S))
+	{
+		SetActorRotation(DirectionX2.Rotation());
+	}
+	*/
 }
 
 void AMain::AttackEnd()
@@ -412,6 +458,34 @@ void AMain::AttackEnd()
 		Attack();
 	}
 	
+}
+
+void AMain::StaminaDelay(float Time)
+{
+	float DeltaStamina = StaminaDrainRate * Time;
+		
+	switch (StaminaStatus)
+	{
+	case EStaminaStatus::ESS_Normal:
+		if (Stamina - DeltaStamina <= MinSprintStamina) //Stamina가 MinSprintStamina보다 아래면 BelowMinimum으로 상태가 변함
+		{
+			SetStaminaStatus(EStaminaStatus::ESS_BelowMinimum);
+		}
+	case EStaminaStatus::ESS_BelowMinimum:
+		if (Stamina - DeltaStamina <= 0.f)
+		{
+			SetStaminaStatus(EStaminaStatus::ESS_Exhausted);
+			Stamina = 0.f;
+			Stunned();
+		}
+		break;
+	default:
+		break;
+	}
+	GetWorld()->GetTimerManager().SetTimer(StaminaDelayTimer,
+		FTimerDelegate::CreateUObject(this, &AMain::RcoveringStamina, Time),
+		AttackReCoverStaminaTime, false, AttackReCoverStaminaTime);
+	ShiftKeyUp(); // shift키를 누르면서 공격중이어도 안눌린 것처럼 만들어줌
 }
 
 void AMain::NextAttackAnim()
@@ -544,9 +618,11 @@ void AMain::RcoveringStamina(float Time)
 	switch (StaminaStatus)
 	{
 	case EStaminaStatus::ESS_Normal:
-		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 BelowMinimum으로 상태가 변함
+		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 
 		{
-			if (Stamina - DeltaStamina <= MinSprintStamina)
+			//StaminaDelay(Time);
+
+			if (Stamina - DeltaStamina <= MinSprintStamina) //Stamina가 MinSprintStamina보다 아래면 BelowMinimum으로 상태가 변함
 			{
 				SetStaminaStatus(EStaminaStatus::ESS_BelowMinimum);
 				Stamina -= DeltaStamina;
@@ -589,7 +665,7 @@ void AMain::RcoveringStamina(float Time)
 			{
 				SetStaminaStatus(EStaminaStatus::ESS_Exhausted);
 				Stamina = 0;
-				SetMovementStatus(EMovementStatus::EMS_Normal);
+				
 			}
 			else
 			{
@@ -625,6 +701,7 @@ void AMain::RcoveringStamina(float Time)
 		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
 		{
 			Stamina = 0.f;
+			Stunned();
 		}
 		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown)// shift Key up
 		{
@@ -632,26 +709,28 @@ void AMain::RcoveringStamina(float Time)
 			Stamina += DeltaStamina;
 		}
 
-		if (!bCtrlKeyDown)
-			SetMovementStatus(EMovementStatus::EMS_Normal);
-		else
-			SetMovementStatus(EMovementStatus::EMS_Walking);
+		//if (!bCtrlKeyDown)
+		//	SetMovementStatus(EMovementStatus::EMS_Stun);
+		//else
+		//	SetMovementStatus(EMovementStatus::EMS_Walking);
 		break;
 
 	case EStaminaStatus::ESS_ExhaustedRecovering:
 		if (Stamina + DeltaStamina >= MinSprintStamina)
 		{
 			SetStaminaStatus(EStaminaStatus::ESS_Normal);
+			SetMovementStatus(EMovementStatus::EMS_Normal);
 			Stamina += DeltaStamina;
 
 		}
 		else
 		{
+			SetMovementStatus(EMovementStatus::EMS_Stun);
 			Stamina += DeltaStamina;
 		}
 
 		if (!bCtrlKeyDown)
-			SetMovementStatus(EMovementStatus::EMS_Normal);
+			SetMovementStatus(EMovementStatus::EMS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
 
@@ -670,6 +749,7 @@ bool AMain::CanMove(float Value)
 		return (Value != 0.0f) &&
 			 (!bDashing) &&
 			(!bAttacking) &&
+			MovementStatus != EMovementStatus::EMS_Stun &&
 			!MainPlayerController->bPauseMenuVisible;
 	}
 	return false;
@@ -694,6 +774,7 @@ void AMain::MoveForward(float Value)
 void AMain::MoveRight(float Value)
 {
 	bMovingRight = false;
+	
 	if (CanMove(Value))
 	{
 		//옆으로 가는 방향 설정 (const는 바꾸지 않을 것에 사용)
@@ -709,6 +790,7 @@ void AMain::MoveRight(float Value)
 
 void AMain::Turn(float Value)
 {
+	
 	if (CanMove(Value))
 	{
 		AddControllerYawInput(Value);
@@ -754,11 +836,12 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 			{
 				UGameplayStatics::PlaySound2D(this, Enemy->HitSound);
 			}
+
+			
 			if (DamageTypeClass)
 			{
-				UGameplayStatics::ApplyDamage(Enemy, Damage, WeaponInstigator, this, DamageTypeClass);
+				UGameplayStatics::ApplyDamage(Enemy, HealthDamage, (StaminaDamage, MaxStaminaDamage, WeaponInstigator), this, DamageTypeClass);
 			}
-
 		}
 	}
 }

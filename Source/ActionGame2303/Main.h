@@ -12,6 +12,8 @@ enum class EMovementStatus : uint8
 	EMS_Normal UMETA(DisplayName = "Normal"),
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
 	EMS_Walking UMETA(DisplayName = "Walking"),
+	EMS_Stun UMETA(DisplayName = "Stun"),
+	EMS_Attacking UMETA(DisplayName = "Attacking"),
 	EMS_Dead UMETA(DisplayName = "Dead"),
 
 
@@ -61,7 +63,13 @@ public:
 		class UBoxComponent* SwordCombatCollision;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-		float Damage;
+		float HealthDamage; 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float StaminaDamage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float MaxStaminaDamage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class USoundCue* SwordSwingSound;
@@ -74,6 +82,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* DashSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+		USoundCue* StunSound;
 
 	//공격시 에너미 쪽을 향해 캐릭터 회전
 	float InterpSpeed;
@@ -193,6 +204,19 @@ public:
 	//스태미나 회복함수
 	void RcoveringStamina(float Time);
 
+	void Stunned();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player Stats")
+		UAnimMontage* StunMontage;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bStunned;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bPlayingStunMontage;
+
+
+
 	//점프
 	virtual void Jump() override;
 
@@ -211,7 +235,7 @@ public:
 	UPROPERTY(VisibleAnywhere)
 		bool bPlayingDashMontage;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player Stats")
 		UAnimMontage* DashMontage;
 
 
@@ -276,6 +300,15 @@ public:
 		float AttackReCoverStaminaTime;
 
 	FTimerHandle StaminaDelayTimer;
+
+	UPROPERTY(EditAnywhere)
+		float AttackDistance = 500.f;
+
+	UPROPERTY(EditAnywhere)
+		float AttackStamina= 100.f;
+
+	void StaminaDelay(float Time);
+
 	//FTimerManager StaminaDelayTimer;
 
 	//bool bMontageEnd;
@@ -302,6 +335,5 @@ public:
 
 	//WeaponInstigator AController에 경험치등 여러 정보를 저장 가능하게함
 	FORCEINLINE void SetInstigator(AController* Inst) { WeaponInstigator = Inst; }
-
 
 };

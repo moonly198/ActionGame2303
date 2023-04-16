@@ -76,7 +76,7 @@ public:
 		float MaxStamina;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
-		float Damage;
+		float EnemyHealthDamage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		class UParticleSystem* HitParticles;
@@ -165,6 +165,7 @@ public:
 
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+	void DamagedStamina();
 	void Die();
 
 	UFUNCTION(BlueprintCallable)
