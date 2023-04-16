@@ -9,9 +9,13 @@
 UENUM(BlueprintType)
 enum class EEnemyMovementStatus :uint8
 {
+	
 	EMS_Idle			UMETA(DeplayName = "Idle"),
 	EMS_MoveToTarget	UMETA(DeplayName = "MoveToTarget"),
 	EMS_Attacking		UMETA(DeplayName = "Attacking"),
+	EMS_Beaten		UMETA(DeplayName = "Beaten"),
+	EMS_Stun		UMETA(DeplayName = "Stun"),
+	EMS_CriticalStun		UMETA(DeplayName = "CriticalStun"),
 	EMS_Dead		UMETA(DeplayName = "Dead"),
 
 	EMS_MAX				UMETA(DeplayName = "DefaultMax")
@@ -28,27 +32,28 @@ public:
 	// Sets default values for this character's properties
 	AMutant();
 
-	/*
+	
 	//공격시 에너미 쪽을 향해 캐릭터 회전
 	float InterpSpeed;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 		bool bInterpToEnemy;
+
 	void SetInterpToEnemy(bool Interp);
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AI")
-		class AMain* CombatTarget;
+	//UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AI")
+		//class AMain* CombatTarget;
 
 	FORCEINLINE void SetCombatTarget(AMain* Target) { CombatTarget = Target; }
 
 	FRotator GetLookAtRotationYaw(FVector Target);
-	*/
+	
 
-
+	//class AMain* Main;
 
 	bool bHasValidTarget;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 		EEnemyMovementStatus EnemyMovementStatus;
 
 	FORCEINLINE void SetEnemyMovementStatus(EEnemyMovementStatus Status) { EnemyMovementStatus = Status; }
@@ -73,11 +78,18 @@ public:
 		float Stamina;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float CurrentMaxStamina;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float StaminaDrainRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		float MaxStamina;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		float EnemyHealthDamage;
 
+	//공격
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		class UParticleSystem* HitParticles;
 
@@ -95,6 +107,38 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UAnimMontage* CombatMontage;
+
+	bool bTakeDamage = false;
+
+	//맞으면 경직
+	void Rigid();
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+	bool bBeaten;
+
+	//Stun
+	void Stunned();
+
+	void CriticalStunned();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+		UAnimMontage* StunMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		USoundCue* StunSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float StunTime;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bStunned;
+
+	bool bWasStunned = false;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bCriticalStunned;
+
+	FTimerHandle StunTimer;
 
 	// enemy가 시간을 두고 공격하기 원함
 	FTimerHandle AttackTimer;

@@ -163,6 +163,7 @@ void AMain::Tick(float DeltaTime)
 		}
 	}
 
+	//공격시 잠시 기다렸다가 스태미나 회복 
 	if (bAttacking)
 		StaminaDelay(DeltaTime);
 	else
@@ -178,7 +179,7 @@ void AMain::Tick(float DeltaTime)
 
 		SetActorRotation(InterpRotation);
 	}
-
+	
 }
 
 FRotator AMain::GetLookAtRotationYaw(FVector Target)
@@ -315,7 +316,7 @@ void AMain::Stunned()
 		if (AnimInstance && StunMontage)
 		{
 				AnimInstance->Montage_Play(StunMontage, 1);
-				AnimInstance->Montage_JumpToSection(FName("Stun_Idle"),StunMontage);
+				AnimInstance->Montage_JumpToSection(FName("Stun_Start"),StunMontage);
 		}
 	}
 }
@@ -571,7 +572,6 @@ void AMain::RMBUp()
 {
 
 }
-
 
 void AMain::ESCDown()
 {

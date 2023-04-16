@@ -16,6 +16,7 @@
 #include "Components/CapsuleComponent.h"
 #include "MainPlayerController.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "EnemyAnimInstance.h"
 
 // Sets default values
 AMutant::AMutant()
@@ -43,7 +44,10 @@ AMutant::AMutant()
 	MaxHealth = 1000.f;
 
 	Stamina = 500.f;
+	CurrentMaxStamina = 0.f;
 	MaxStamina = 500.f;
+
+	StaminaDrainRate = 50.f;
 
 	EnemyHealthDamage = 10.f;
 
@@ -52,14 +56,18 @@ AMutant::AMutant()
 
 	EnemyMovementStatus = EEnemyMovementStatus::EMS_Idle;
 
+	StunTime = 5.f;
+
 	DeathDelay = 1.f;
 
 	bHasValidTarget = false;
 
+	bBeaten = false;
 	//InterpSpeed = 15.f;
 	//bInterpToEnemy = false;
 
 }
+
 
 // Called when the game starts or when spawned
 void AMutant::BeginPlay()
@@ -67,6 +75,7 @@ void AMutant::BeginPlay()
 	Super::BeginPlay();
 
 	AIController = Cast<AAIController>(GetController());
+	//Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
 	AgroSphere->OnComponentBeginOverlap.AddDynamic(this, &AMutant::AgroSphereOnOverlapBegin);
 	AgroSphere->OnComponentEndOverlap.AddDynamic(this, &AMutant::AgroSphereOnOverlapEnd);
@@ -96,7 +105,46 @@ void AMutant::BeginPlay()
 void AMutant::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	/*
+
+	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Dead) return;
+	float DeltaStamina = StaminaDrainRate * DeltaTime;
+	if (bStunned)
+	{
+		Rigid();
+	}
+	
+	//스턴이 한번 된 후 스턴이 아니게되면 
+	if (bWasStunned != bStunned && !bStunned)
+	{
+		//SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Attacking);
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && StunMontage)
+		{
+			if (AnimInstance->Montage_IsPlaying(StunMontage))
+			{
+				AnimInstance->Montage_Stop(0.3f, StunMontage);
+			}
+		}
+
+		if (Stamina >= (MaxStamina - CurrentMaxStamina))
+		{
+			Stamina = MaxStamina - CurrentMaxStamina;
+		}
+		else
+		{
+			Stamina += DeltaStamina;
+		}
+		Stamina = (MaxStamina - CurrentMaxStamina);
+
+		if (bOverlappingCombatSphere)
+		{
+			Attack();
+		}
+
+		bWasStunned = bStunned; // bStunned = false임 bWasStunne은 스턴 함수에서 트루로 변경해줌
+	}
+	
+	
 	if (bInterpToEnemy && CombatTarget)
 	{
 		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
@@ -104,10 +152,10 @@ void AMutant::Tick(float DeltaTime)
 
 		SetActorRotation(InterpRotation);
 	}
-	*/
+	
 }
 
-/*
+
 FRotator AMutant::GetLookAtRotationYaw(FVector Target)
 {
 	FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Target);
@@ -119,7 +167,7 @@ void AMutant::SetInterpToEnemy(bool Interp)
 {
 	bInterpToEnemy = Interp;
 }
-*/
+
 // Called to bind functionality to input
 void AMutant::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -132,6 +180,7 @@ void AMutant::AgroSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 	if (OtherActor)
 	{
 		AMain* Main = Cast<AMain>(OtherActor);
+		
 		if (Main)
 		{
 			// 적 체력바
@@ -155,6 +204,7 @@ void AMutant::AgroSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 	if (OtherActor)
 	{
 		AMain* Main = Cast<AMain>(OtherActor);
+		
 		{
 			if (Main)
 			{
@@ -189,10 +239,8 @@ void AMutant::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponen
 		{
 			if (Main)
 			{
-				
 				bOverlappingCombatSphere = true;
-
-				Attack();
+				Attack();	
 			}
 		}
 	}
@@ -203,11 +251,12 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 	if (OtherActor)
 	{
 		AMain* Main = Cast<AMain>(OtherActor);
+		
 		{
 			if (Main)
 			{
 				bOverlappingCombatSphere = false;
-				if (EnemyMovementStatus != EEnemyMovementStatus::EMS_Attacking)
+				if (EnemyMovementStatus != EEnemyMovementStatus::EMS_Attacking && !bStunned && !bCriticalStunned)
 				{
 					MoveToTarget(Main);
 					CombatTarget = nullptr;
@@ -225,21 +274,20 @@ void AMutant::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent,
 
 void AMutant::MoveToTarget(AMain* Target)
 {
+	
 	UE_LOG(LogTemp, Warning, TEXT("MoveToTarget"));
 	SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
 
 	if (AIController)
 	{
+
 		FAIMoveRequest MoveRequest;
 		MoveRequest.SetGoalActor(Target);
 		MoveRequest.SetAcceptanceRadius(10.0f); // 두 콜리전 사이 거리
 
-
 		FNavPathSharedPtr NavPath;
-
+		
 		AIController->MoveTo(MoveRequest, &NavPath); //NavPath의 동일한 주소를 따라가야함
-
-
 
 		/* navPath 경로에 구를 설치해서 목적지를 볼수 잇음
 		auto PathPoints = NavPath->GetPathPoints();
@@ -258,6 +306,7 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 	if (OtherActor)
 	{
 		AMain* Main = Cast<AMain>(OtherActor);
+		
 		if (Main)
 		{
 			if (Main->HitParticles)
@@ -288,7 +337,6 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 	}
 }
 
-
 void AMutant::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 }
@@ -303,7 +351,6 @@ void AMutant::ActivateCollision()
 	}
 }
 
-
 void AMutant::DeactivateCollision()
 {
 	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -312,7 +359,7 @@ void AMutant::DeactivateCollision()
 
 void AMutant::Attack()
 {
-	if (Alive() && bHasValidTarget)
+	if (Alive() && bHasValidTarget && !bStunned && !bCriticalStunned)
 	{
 		if (AIController)
 		{
@@ -323,7 +370,7 @@ void AMutant::Attack()
 		{
 			
 			bAttacking = true;
-			//SetInterpToEnemy(true);
+			SetInterpToEnemy(true);
 
 			UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 
@@ -343,17 +390,20 @@ void AMutant::Attack()
 					case 0:
 						AnimInstance->Montage_Play(CombatMontage, 1.f);
 						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Punch"), CombatMontage);
+						
 						break;
 
 					case 1:
 						AnimInstance->Montage_Play(CombatMontage,1.f);
 						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Swiping"), CombatMontage);
+						
 						break;
 					case 2:
 						if (DistanceToMain <= 300)
 						{
 							AnimInstance->Montage_Play(CombatMontage, 1.f);
 							AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
+							
 						}
 						
 						break;
@@ -374,6 +424,7 @@ void AMutant::Attack()
 void AMutant::AttackEnd()
 {
 	bAttacking = false;
+
 	//CombatSphereOverlapEnd 가 실행이 됬는데 EMS_Attacking 일 경우에는 AttackEnd()에서 한번더 검사
 	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Attacking)
 	{
@@ -388,8 +439,10 @@ void AMutant::AttackEnd()
 		//AttackTime 후 에 Attack()함수 호출
 		GetWorldTimerManager().SetTimer(AttackTimer, this, &AMutant::Attack, AttackTime);
 	}
+
+
 	
-	//SetInterpToEnemy(false);
+	SetInterpToEnemy(false);
 
 }
 
@@ -413,7 +466,10 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	//Stamina
 	if (Stamina - DamageAmount <= 0.f)
 	{
+		//Stamina가 0일 시에 Enemy는 잠시 Stun 상태가 됨.
 		Stamina = 0.f;
+		if(!bStunned)
+		Stunned();
 	}
 	else
 	{
@@ -422,14 +478,26 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	
 	DamageAmount = Main->MaxStaminaDamage;
 	//MaxStamina
-	if (MaxStamina - DamageAmount <= 0.f)
+	if (CurrentMaxStamina + DamageAmount >= MaxStamina)
 	{
-		MaxStamina = 0.f;
+		//CurrentMaxStamina가 MaxStamina까지 다 차게 된다면 Enemy는 강공격이 들어가는 상태가 됨
+		CurrentMaxStamina = MaxStamina;
 	}
 	else
-	{
-		MaxStamina -= DamageAmount;
+	{	
+		//위젯에서 줄어드는 것처럼 보이기 위해 프로그래스 바를 오른쪽에서 왼쪽으로 차게한다음 
+		//CurrentMaxStamina에 Main->StaminaDamage를 더해주어 줄어드는것 처럼 보이게 함. 
+		CurrentMaxStamina += DamageAmount;
 	}
+	
+	
+	const FVector MainForwordDir = Main->GetActorRotation().Vector() ; // 메인캐릭터가 가고있는 앞쪽방향
+	LaunchCharacter((MainForwordDir * Main->AttackDistance) /2, true, false);
+	FTimerHandle aa;
+	GetWorld()->GetTimerManager().SetTimer(aa, FTimerDelegate::CreateLambda([&]()
+		{
+			bTakeDamage = false;
+		}), 0.5f, false);
 
 	return DamageAmount;
 }
@@ -477,3 +545,103 @@ void AMutant::Disappear()
 	Destroy();
 }
 
+
+void AMutant::Stunned()
+{
+	UE_LOG(LogTemp, Warning, TEXT("MutantStun!"));
+	EnemyMovementStatus = EEnemyMovementStatus::EMS_Stun;
+	AttackEnd();
+	bAttacking = false;
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	class UEnemyAnimInstance* EnemyAnimInstance;
+	EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
+
+	if (EnemyAnimInstance != nullptr)
+	{
+		UGameplayStatics::PlaySound2D(this, StunSound);
+		bStunned = true;
+
+		if (AnimInstance && StunMontage)
+		{
+			AnimInstance->Montage_Play(StunMontage, 1);
+			AnimInstance->Montage_JumpToSection(FName("Mutant_Stunned_Idle"), StunMontage);
+
+			GetWorld()->GetTimerManager().SetTimer(StunTimer, FTimerDelegate::CreateLambda([&]()
+			{
+				bStunned = false;
+				//Main 캐스팅을 람다함수 전에 만들면 오류가 남
+				AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+				MoveToTarget(Main);
+			}), StunTime, false);
+		}
+	}
+	bWasStunned = true;
+}
+
+void AMutant::CriticalStunned()
+{
+	UE_LOG(LogTemp, Warning, TEXT("MutantCriticalStun!"));
+	EnemyMovementStatus = EEnemyMovementStatus::EMS_CriticalStun;
+	AttackEnd();
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	class UEnemyAnimInstance* EnemyAnimInstance;
+	EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
+	if (EnemyAnimInstance != nullptr)
+	{
+		UGameplayStatics::PlaySound2D(this, StunSound);
+		bStunned = true;
+
+		if (AnimInstance && StunMontage)
+		{
+			AnimInstance->Montage_Play(StunMontage, 1);
+			AnimInstance->Montage_JumpToSection(FName("Stun_Idle"), StunMontage);
+		}
+	}
+}
+
+//스턴때 맞으면 경직
+void AMutant::Rigid()
+{
+	//EnemyMovementStatus = EEnemyMovementStatus::EMS_Beaten;
+	bBeaten = true;
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && StunMontage)
+	{
+		/*
+		if (AnimInstance->Montage_IsPlaying(CombatMontage))
+		{
+			AnimInstance->Montage_Stop(0.f, CombatMontage);
+		}
+		*/
+
+		AnimInstance->Montage_Play(StunMontage, 1.f);
+		AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);
+		/* 일반 공격시 경직을 먹이고 싶을때 
+		FTimerHandle RigTimer;
+
+		float HitReactLength = StunMontage->GetSectionLength(1);
+		
+		GetWorld()->GetTimerManager().SetTimer(RigTimer, FTimerDelegate::CreateLambda([&]()
+			{
+				
+				if (bOverlappingCombatSphere)
+				{
+					Attack();
+				}
+				else
+				{
+					AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+					MoveToTarget(Main);
+				}
+				
+				bBeaten = false;
+
+			}), HitReactLength + 1.f, false);
+			
+			*/
+
+	}
+	
+	
+}
