@@ -147,6 +147,7 @@ void AMain::Tick(float DeltaTime)
 		}
 	}
 	
+	
 
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
@@ -338,23 +339,27 @@ void AMain::LMBDown()
 			return;
 
 	
+	// 클릭 횟수 증가
+	ClickCount++;
+	
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
 	if (!bDashing && !bStunned)
 	{
 		if (bFirstClick)
 		{
+			
 			Attack();
 			bFirstClick = false;
-			LastLeftClickTime = CurrentTime;
+			//LastLeftClickTime = CurrentTime;
 
 		}
-		else if ((!bLMBDown) && (CurrentTime - LastLeftClickTime < ClickInterval) && !LastAttack)
+		else if ((!bLMBDown) && !bLastAttack)
 		{
 			// Double click
-
 			NextAttackAnim();
-			LastLeftClickTime = CurrentTime;
+			
 		}
 		else
 		{
@@ -363,6 +368,29 @@ void AMain::LMBDown()
 		}
 	}
 	bLMBDown = true;
+}
+
+void AMain::CountClicked()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	const FAnimMontageInstance* CombatMontageInstance = AnimInstance->GetActiveInstanceForMontage(CombatMontage);
+	if (CombatMontage && !AnimInstance->Montage_IsPlaying(CombatMontage))
+	{
+		//const float CurrentTime = CombatMontageInstance->GetPosition();
+
+		// 처음 클릭 이벤트 처리
+		if (!bFirstClick)
+		{
+			
+			return;
+		}
+		if (ClickCount >= 2)
+		{
+
+		}
+
+	}
+
 }
 
 void AMain::LMBUp()
@@ -396,6 +424,8 @@ void AMain::Attack()
 				AnimInstance->Montage_JumpToSection(FName("Attack_1"), CombatMontage);
 
 				LaunchCharacter(ForwardDir * AttackDistance, true, false);  //AttackDistance만큼 앞으로
+
+
 			}
 			else if (CurrentComboCount == 1)
 			{
@@ -412,7 +442,7 @@ void AMain::Attack()
 				AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
 				LaunchCharacter(ForwardDir * AttackDistance, true, false);
 				
-				LastAttack = true;
+				bLastAttack = true;
 			}
 		}
 	}
@@ -452,8 +482,10 @@ void AMain::AttackEnd()
 	bAttacking = false;
 	SetInterpToEnemy(false);
 	bFirstClick = true;
-	LastAttack = false;
+	bLastAttack = false;
 	CurrentComboCount = 0;
+
+	
 	if (bLMBDown)
 	{
 		Attack();

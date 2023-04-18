@@ -244,6 +244,13 @@ public:
 	bool bLMBDown;
 	void LMBDown();
 	void LMBUp();
+	void CountClicked();
+
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
+		int ClickCount =0;
+
+	float CurrentMontageTime;
+	float LastClickTime;
 
 	UPROPERTY(VisibleAnywhere, Category = "Combat")
 	float LastLeftClickTime;
@@ -252,7 +259,7 @@ public:
 	float ClickInterval = 1.f;
 
 	bool bFirstClick = true;
-	bool LastAttack = false;
+	bool bLastAttack = false;
 
 	bool bRMBDown;
 	void RMBDown();
