@@ -38,6 +38,9 @@ AMutant::AMutant()
 	RightCombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("RightCombatCollision"));
 	RightCombatCollision->SetupAttachment(GetMesh(), FName("RightEnemySocket"));
 
+	FootCombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("FootCombatCollision"));
+	FootCombatCollision->SetupAttachment(GetMesh(), FName("FootEnemySocket"));
+
 	bOverlappingCombatSphere = false;
 
 	Health = 1000.f;
@@ -63,6 +66,7 @@ AMutant::AMutant()
 	bHasValidTarget = false;
 
 	bBeaten = false;
+	AttackedDistance = 100.f;
 	//InterpSpeed = 15.f;
 	//bInterpToEnemy = false;
 
@@ -98,6 +102,15 @@ void AMutant::BeginPlay()
 	RightCombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
 	RightCombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	RightCombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+
+	FootCombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMutant::CombatOnOverlapBegin);
+	FootCombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMutant::CombatOnOverlapEnd);
+
+	FootCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FootCombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+	FootCombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	FootCombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+
 	
 }
 
@@ -313,6 +326,7 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 			{
 				const USkeletalMeshSocket* TipSocket = GetMesh()->GetSocketByName("TipSocket");
 				const USkeletalMeshSocket* PunchSocket = GetMesh()->GetSocketByName("PunchSocket");
+				const USkeletalMeshSocket* FootSocket = GetMesh()->GetSocketByName("FootSocket");
 				if (TipSocket)
 				{
 					FVector SocketLocation = TipSocket->GetSocketLocation(GetMesh());
@@ -322,6 +336,12 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 				{
 					FVector SocketLocation = PunchSocket->GetSocketLocation(GetMesh());
 					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Main->HitParticles, SocketLocation, FRotator(0.f), false);
+				}
+				if (FootSocket)
+				{
+					FVector SocketLocation = FootSocket->GetSocketLocation(GetMesh());
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), (Main->HitParticles, FootHitParticles), SocketLocation, FRotator(0.f), false);
+					//UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), FootHitParticles, SocketLocation, FRotator(0.f), false);
 				}
 			}
 			if (Main->HitSound)
@@ -343,11 +363,44 @@ void AMutant::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActo
 
 void AMutant::ActivateCollision()
 {
-	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && CombatMontage)
+	{
+		if (AnimInstance->Montage_GetCurrentSection(CombatMontage) == FName("MutantAttack_Swiping"))
+		{
+			LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			
+		}
+		else if (AnimInstance->Montage_GetCurrentSection(CombatMontage) == FName("MutantAttack_Punch"))
+		{
+			RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			
+		}
+		else if (AnimInstance->Montage_GetCurrentSection(CombatMontage) == FName("MutantAttack_Jumping"))
+		{
+			FootCombatCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		
+		}
+	}
+	
+	
+
 	if (SwingSound)
 	{
 		UGameplayStatics::PlaySound2D(this, SwingSound);
+	}
+
+	if (LeftCombatCollision->IsQueryCollisionEnabled())
+	{
+		UGameplayStatics::PlaySound2D(this, SwipingAttackSound);
+	}
+	else if (RightCombatCollision->IsQueryCollisionEnabled())
+	{
+		UGameplayStatics::PlaySound2D(this, PunchAttackSound);
+	}
+	else if (FootCombatCollision->IsQueryCollisionEnabled())
+	{
+		UGameplayStatics::PlaySound2D(this, FootAttackSound);
 	}
 }
 
@@ -355,6 +408,7 @@ void AMutant::DeactivateCollision()
 {
 	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FootCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void AMutant::Attack()
@@ -399,7 +453,7 @@ void AMutant::Attack()
 						
 						break;
 					case 2:
-						if (DistanceToMain <= 300)
+						if (DistanceToMain <= 300.f)
 						{
 							AnimInstance->Montage_Play(CombatMontage, 1.f);
 							AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
@@ -492,7 +546,7 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	
 	
 	const FVector MainForwordDir = Main->GetActorRotation().Vector() ; // 메인캐릭터가 가고있는 앞쪽방향
-	LaunchCharacter((MainForwordDir * Main->AttackDistance) /2, true, false);
+	LaunchCharacter((MainForwordDir * AttackedDistance) /2, true, false);
 	FTimerHandle aa;
 	GetWorld()->GetTimerManager().SetTimer(aa, FTimerDelegate::CreateLambda([&]()
 		{
@@ -520,6 +574,7 @@ void AMutant::Die()
 
 	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FootCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AgroSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	CombatSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -614,9 +669,13 @@ void AMutant::Rigid()
 			AnimInstance->Montage_Stop(0.f, CombatMontage);
 		}
 		*/
-
-		AnimInstance->Montage_Play(StunMontage, 1.f);
-		AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);
+		//스턴상태일때만 경직 먹기
+		if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Stun)
+		{
+			AnimInstance->Montage_Play(StunMontage, 1.f);
+			AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);
+		}
+		
 		/* 일반 공격시 경직을 먹이고 싶을때 
 		FTimerHandle RigTimer;
 

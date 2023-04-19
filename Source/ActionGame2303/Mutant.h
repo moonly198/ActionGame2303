@@ -99,11 +99,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		USoundCue* SwingSound;
 
+	//각각 공격 사운드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		USoundCue* SwipingAttackSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		USoundCue* PunchAttackSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		USoundCue* FootAttackSound;
+
+	//각각 공격 콜리전
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UBoxComponent* LeftCombatCollision;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
-		class UBoxComponent* RightCombatCollision;
+		UBoxComponent* RightCombatCollision;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+		UBoxComponent* FootCombatCollision;
+
+	//각 공격시 파티클
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		UParticleSystem* FootHitParticles;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UAnimMontage* CombatMontage;
@@ -115,6 +133,9 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 	bool bBeaten;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float AttackedDistance;
 
 	//Stun
 	void Stunned();

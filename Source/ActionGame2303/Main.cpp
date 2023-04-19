@@ -134,18 +134,24 @@ void AMain::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
-	if ( MovementStatus != EMovementStatus::EMS_Stun)
+	if (MovementStatus == EMovementStatus::EMS_Stun)
 	{
-		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		if (AnimInstance && StunMontage)
+		if (MovementStatus != EMovementStatus::EMS_Stun)
 		{
-			if (AnimInstance->Montage_IsPlaying(StunMontage))
+			UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+			if (AnimInstance && StunMontage)
 			{
-				AnimInstance->Montage_Stop(0.3f, StunMontage);
-				bStunned = false;
+				if (AnimInstance->Montage_IsPlaying(StunMontage))
+				{
+					AnimInstance->Montage_Stop(0.3f, StunMontage);
+					bStunned = false;
+				}
+				
+				
 			}
 		}
 	}
+	
 	
 	
 
@@ -304,7 +310,7 @@ void AMain::Dashing()
 void AMain::Stunned()
 {
 	MovementStatus = EMovementStatus::EMS_Stun;
-	bAttacking = false;
+	SetInterpToEnemy(false);
 	UE_LOG(LogTemp, Warning, TEXT("Stun!"));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	class UMainAnimInstance* MainAnimInstance;
@@ -316,10 +322,25 @@ void AMain::Stunned()
 
 		if (AnimInstance && StunMontage)
 		{
-				AnimInstance->Montage_Play(StunMontage, 1);
-				AnimInstance->Montage_JumpToSection(FName("Stun_Start"),StunMontage);
+			if (bDashing || bShiftKeyDown)
+			{
+				AnimInstance->Montage_Play(StunMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Stun_Start"), StunMontage);
+			}
+			else if (bAttacking)
+			{
+				if (AnimInstance->Montage_IsActive(CombatMontage))
+				{
+					AnimInstance->Montage_Stop(0.f,CombatMontage);
+				}
+				AnimInstance->Montage_Play(StunMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Stun_Idle"), StunMontage);
+
+			}
+				
 		}
 	}
+	bAttacking = false;
 }
 
 void AMain::TargetingMode()
@@ -554,6 +575,17 @@ void AMain::DecrementHealth(float Amount)
 
 float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (MovementStatus == EMovementStatus::EMS_Stun && AnimInstance && StunMontage)
+	{
+		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
+		LaunchCharacter(EnemyForwardDir * (DashDistance*2)/3, true, false);  //AttackDistance만큼 앞으로
+		AnimInstance->Montage_Play(StunMontage,0.7f);
+		AnimInstance->Montage_JumpToSection(FName("Stun_HitReact"), StunMontage);
+		
+	}
+
 	if (Health - DamageAmount <= 0.f)
 	{
 		Health -= DamageAmount;
@@ -572,6 +604,8 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 		Health -= DamageAmount;
 	}
 
+
+	
 	return DamageAmount;
 }
 
