@@ -106,6 +106,8 @@ AMain::AMain()
 	bMovingForward = false;
 	bMovingRight = false;
 
+	bReadyStunned = true;
+
 	
 }
 
@@ -134,24 +136,22 @@ void AMain::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
-	if (MovementStatus == EMovementStatus::EMS_Stun)
+	if (MovementStatus != EMovementStatus::EMS_Stun && !bReadyStunned)
 	{
-		if (MovementStatus != EMovementStatus::EMS_Stun)
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && StunMontage)
 		{
-			UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-			if (AnimInstance && StunMontage)
+			if (AnimInstance->Montage_IsPlaying(StunMontage))
 			{
-				if (AnimInstance->Montage_IsPlaying(StunMontage))
-				{
-					AnimInstance->Montage_Stop(0.3f, StunMontage);
-					bStunned = false;
-				}
-				
-				
+				AnimInstance->Montage_Stop(0.3f, StunMontage);
+				bStunned = false;
+				bReadyStunned = true;
 			}
+			
+			
 		}
 	}
-	
+		
 	
 	
 
@@ -309,6 +309,7 @@ void AMain::Dashing()
 
 void AMain::Stunned()
 {
+	bReadyStunned = false;
 	MovementStatus = EMovementStatus::EMS_Stun;
 	SetInterpToEnemy(false);
 	UE_LOG(LogTemp, Warning, TEXT("Stun!"));
@@ -326,21 +327,25 @@ void AMain::Stunned()
 			{
 				AnimInstance->Montage_Play(StunMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("Stun_Start"), StunMontage);
+				bDashing = false;
+				bShiftKeyDown = false;
 			}
 			else if (bAttacking)
 			{
+				
 				if (AnimInstance->Montage_IsActive(CombatMontage))
 				{
 					AnimInstance->Montage_Stop(0.f,CombatMontage);
 				}
 				AnimInstance->Montage_Play(StunMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("Stun_Idle"), StunMontage);
+				bAttacking = false;
 
 			}
 				
 		}
 	}
-	bAttacking = false;
+	
 }
 
 void AMain::TargetingMode()
@@ -583,6 +588,8 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 		LaunchCharacter(EnemyForwardDir * (DashDistance*2)/3, true, false);  //AttackDistance만큼 앞으로
 		AnimInstance->Montage_Play(StunMontage,0.7f);
 		AnimInstance->Montage_JumpToSection(FName("Stun_HitReact"), StunMontage);
+		bStunned = false;
+		bReadyStunned = true;
 		
 	}
 
@@ -684,7 +691,7 @@ void AMain::RcoveringStamina(float Time)
 	switch (StaminaStatus)
 	{
 	case EStaminaStatus::ESS_Normal:
-		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown) // 달리거나 대쉬할때, 걷지않을때 
+		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown && !bStunned) // 달리거나 대쉬할때, 걷지않을때 
 		{
 			//StaminaDelay(Time);
 
@@ -725,7 +732,7 @@ void AMain::RcoveringStamina(float Time)
 		break;
 
 	case EStaminaStatus::ESS_BelowMinimum:
-		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
+		if ((bShiftKeyDown || bDashing ) && !bCtrlKeyDown && !bStunned)
 		{
 			if (Stamina - DeltaStamina <= 0.f)
 			{
@@ -764,9 +771,10 @@ void AMain::RcoveringStamina(float Time)
 		break;
 
 	case EStaminaStatus::ESS_Exhausted:
-		if ((bShiftKeyDown || bDashing) && !bCtrlKeyDown)
+		if ((bShiftKeyDown || bDashing ) && !bCtrlKeyDown)
 		{
 			Stamina = 0.f;
+			
 			Stunned();
 		}
 		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown)// shift Key up
@@ -799,9 +807,7 @@ void AMain::RcoveringStamina(float Time)
 			SetMovementStatus(EMovementStatus::EMS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
-
 		break;
-
 	default:
 		;
 
@@ -816,6 +822,7 @@ bool AMain::CanMove(float Value)
 			 (!bDashing) &&
 			(!bAttacking) &&
 			MovementStatus != EMovementStatus::EMS_Stun &&
+			(!bStunned)&&
 			!MainPlayerController->bPauseMenuVisible;
 	}
 	return false;

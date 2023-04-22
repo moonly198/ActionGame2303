@@ -213,7 +213,7 @@ public:
 		bool bStunned;
 
 	UPROPERTY(VisibleAnywhere)
-		bool bPlayingStunMontage;
+		bool bReadyStunned;
 
 
 
