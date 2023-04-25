@@ -89,6 +89,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		float EnemyHealthDamage;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float EnemyCriticalDamage;
+
 	//АјАн
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		class UParticleSystem* HitParticles;

@@ -53,6 +53,7 @@ AMutant::AMutant()
 	StaminaDrainRate = 50.f;
 
 	EnemyHealthDamage = 10.f;
+	EnemyCriticalDamage = 100.f;
 
 	AttackMinTime = 0.5f;
 	AttackMaxTime = 3.5f;
@@ -350,6 +351,11 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 			}
 			if (DamageTypeClass)
 			{
+				if (Main->MovementStatus == EMovementStatus::EMS_Stun)
+				{
+					UGameplayStatics::ApplyDamage(Main, EnemyCriticalDamage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TakeDamage();
+				}
+				else
 				UGameplayStatics::ApplyDamage(Main, EnemyHealthDamage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TakeDamage();
 			}
 			
@@ -507,12 +513,18 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	DamageAmount = Main->HealthDamage;
 	if (Health - DamageAmount <= 0.f)
 	{
+		
 		Health -= DamageAmount;
 		Die();
 	}
 	else
 	{
-		Health -= DamageAmount;
+		if (Main->CurrentComboCount == 0)
+			Health -= DamageAmount;
+		else if (Main->CurrentComboCount == 1)
+			Health -= DamageAmount+100;
+		else if (Main->CurrentComboCount == 2)
+			Health -= DamageAmount+200;
 		
 	}
 	

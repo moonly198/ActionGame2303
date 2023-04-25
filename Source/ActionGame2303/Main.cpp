@@ -136,25 +136,57 @@ void AMain::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
-	if (MovementStatus != EMovementStatus::EMS_Stun && !bReadyStunned)
+	//EMovementStatus::EMS_Stun 이고 스턴상태일때, bStunned으로로 안한 이유는 스턴애님이 바로 해제 됨 
+	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬
+	if (MovementStatus != EMovementStatus::EMS_Stun && !bReadyStunned) 
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && StunMontage)
 		{
-			if (AnimInstance->Montage_IsPlaying(StunMontage))
+			if ( Stamina >= MinSprintStamina) //스태미너 빨간색 초록색으로 변했는데
 			{
-				AnimInstance->Montage_Stop(0.3f, StunMontage);
-				bStunned = false;
-				bReadyStunned = true;
+				if (AnimInstance->Montage_IsPlaying(StunMontage))//아직 스턴 애님이 플레이중이라면
+				{
+					AnimInstance->Montage_Stop(0.1f, StunMontage);
+				}
+				
 			}
-			
+			/* //그냥 스태미너 고갈시 스턴애님을 길게만듬
+			else//스태미너 아직 빨간색이고 스턴 애님이 끝났는데 못움직일때 
+			{
+				if (!AnimInstance->Montage_IsPlaying(StunMontage))
+				{
+					AnimInstance->Montage_Play(StunMontage, 1.f);
+					
+				}
+			}
+			*/
+			bStunned = false;
+			bReadyStunned = true;
 			
 		}
 	}
-		
-	
-	
 
+	//스턴인데 공격을 당했을때 CombatMontage의 Death애님이 끝나면 일어서야함
+	if (MovementStatus == EMovementStatus::EMS_StunTakeDamage)
+	{
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && CombatMontage)
+		{
+			if ( AnimInstance->Montage_IsPlaying(CombatMontage))
+			{
+				SetMovementStatus(EMovementStatus::EMS_StunTakeDamage);
+			}
+			else if (!AnimInstance->Montage_IsPlaying(CombatMontage))
+			{
+				if (Stamina > MinSprintStamina)
+				{
+					SetMovementStatus(EMovementStatus::EMS_Normal);
+				}
+			}
+		}
+
+	}
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
 	//대쉬 몽타주가 끝날때까지 달리지 못함
@@ -270,14 +302,22 @@ void AMain::ShiftKeyUp()
 
 void AMain::CtrlKeyDown()
 {
-	bCtrlKeyDown = true;
-	SetMovementStatus(EMovementStatus::EMS_Walking);
+	if (StaminaStatus == EStaminaStatus::ESS_Normal || StaminaStatus == EStaminaStatus::ESS_BelowMinimum)
+	{
+		bCtrlKeyDown = true;
+		SetMovementStatus(EMovementStatus::EMS_Walking);
+	}
+	
 }
 
 void AMain::CtrlKeyUp()
 {
-	bCtrlKeyDown = false;
-	SetMovementStatus(EMovementStatus::EMS_Normal);
+	if (MovementStatus == EMovementStatus::EMS_Walking)
+	{
+		bCtrlKeyDown = false;
+		SetMovementStatus(EMovementStatus::EMS_Normal);
+	}
+	
 }
 
 void AMain::Dashing()
@@ -364,7 +404,9 @@ void AMain::LMBDown()
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
 
-	
+	if (MovementStatus == EMovementStatus::EMS_Stun ||
+		MovementStatus == EMovementStatus::EMS_StunTakeDamage)
+		return;
 	// 클릭 횟수 증가
 	ClickCount++;
 	
@@ -428,7 +470,11 @@ void AMain::Attack()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (!bAttacking && MovementStatus != EMovementStatus::EMS_Dead && Stamina > 0.f)
+	if (!bAttacking && 
+		MovementStatus != EMovementStatus::EMS_Dead && 
+		MovementStatus != EMovementStatus::EMS_Stun &&
+		MovementStatus != EMovementStatus::EMS_StunTakeDamage &&
+		Stamina > 0.f )
 	{
 		Stamina -= AttackStamina; //공격시 스태미너 AttackStamina만큼 - 하기
 		bAttacking = true;
@@ -582,16 +628,31 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 {
 	
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (MovementStatus == EMovementStatus::EMS_Stun && AnimInstance && StunMontage)
+	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		LaunchCharacter(EnemyForwardDir * (DashDistance*2)/3, true, false);  //AttackDistance만큼 앞으로
-		AnimInstance->Montage_Play(StunMontage,0.7f);
-		AnimInstance->Montage_JumpToSection(FName("Stun_HitReact"), StunMontage);
-		bStunned = false;
-		bReadyStunned = true;
-		
+		if (MovementStatus == EMovementStatus::EMS_Stun)
+		{
+			SetMovementStatus(EMovementStatus::EMS_StunTakeDamage);
+			LaunchCharacter(EnemyForwardDir * (DashDistance * 2) / 3, true, false);  //AttackDistance만큼 앞으로
+			AnimInstance->Montage_Play(CombatMontage, 0.9f);
+			AnimInstance->Montage_JumpToSection(FName("CriticalHitReact"), CombatMontage);
+			bStunned = false;
+			bReadyStunned = true;
+
+		}
+		else
+		{
+			if (!bAttacking && !bDashing && !bStunned )
+			{
+				LaunchCharacter(EnemyForwardDir * (DashDistance / 10), true, false); //일단 설정
+				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("HitReact"), CombatMontage);
+			}
+			
+		}
 	}
+	
 
 	if (Health - DamageAmount <= 0.f)
 	{
@@ -608,6 +669,11 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	}
 	else
 	{
+		/*
+		if(MovementStatus == EMovementStatus::EMS_Stun)
+			Health -= CombatTarget->D;
+		else
+		*/
 		Health -= DamageAmount;
 	}
 
@@ -711,7 +777,11 @@ void AMain::RcoveringStamina(float Time)
 			}
 			else
 			{
-				SetMovementStatus(EMovementStatus::EMS_Normal);
+				if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+				{
+					SetMovementStatus(EMovementStatus::EMS_Normal);
+				}
+				
 			}
 		}
 		else if (!bShiftKeyDown || !bDashing || bCtrlKeyDown) //shift Key up 혹은 대쉬 안할때
@@ -724,9 +794,12 @@ void AMain::RcoveringStamina(float Time)
 			{
 				Stamina += DeltaStamina;
 			}
-			if (!bCtrlKeyDown)
+			if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+			{
 				SetMovementStatus(EMovementStatus::EMS_Normal);
-			else
+			}
+
+			if (bCtrlKeyDown)
 				SetMovementStatus(EMovementStatus::EMS_Walking);
 		}
 		break;
@@ -783,30 +856,35 @@ void AMain::RcoveringStamina(float Time)
 			Stamina += DeltaStamina;
 		}
 
-		//if (!bCtrlKeyDown)
-		//	SetMovementStatus(EMovementStatus::EMS_Stun);
-		//else
-		//	SetMovementStatus(EMovementStatus::EMS_Walking);
+		if (!bCtrlKeyDown)
+			SetMovementStatus(EMovementStatus::EMS_Stun);
+		else
+			SetMovementStatus(EMovementStatus::EMS_Walking);
 		break;
 
 	case EStaminaStatus::ESS_ExhaustedRecovering:
 		if (Stamina + DeltaStamina >= MinSprintStamina)
 		{
 			SetStaminaStatus(EStaminaStatus::ESS_Normal);
-			SetMovementStatus(EMovementStatus::EMS_Normal);
+			if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+			{
+				SetMovementStatus(EMovementStatus::EMS_Normal);
+			}	
 			Stamina += DeltaStamina;
 
 		}
 		else
 		{
-			SetMovementStatus(EMovementStatus::EMS_Stun);
+			//SetMovementStatus(EMovementStatus::EMS_Stun);
 			Stamina += DeltaStamina;
 		}
 
+		/* 어차피 스턴 상태라 못움직임
 		if (!bCtrlKeyDown)
 			SetMovementStatus(EMovementStatus::EMS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
+		*/
 		break;
 	default:
 		;
@@ -822,6 +900,7 @@ bool AMain::CanMove(float Value)
 			 (!bDashing) &&
 			(!bAttacking) &&
 			MovementStatus != EMovementStatus::EMS_Stun &&
+			MovementStatus != EMovementStatus::EMS_StunTakeDamage&&
 			(!bStunned)&&
 			!MainPlayerController->bPauseMenuVisible;
 	}

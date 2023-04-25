@@ -14,6 +14,7 @@ enum class EMovementStatus : uint8
 	EMS_Walking UMETA(DisplayName = "Walking"),
 	EMS_Stun UMETA(DisplayName = "Stun"),
 	EMS_Attacking UMETA(DisplayName = "Attacking"),
+	EMS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
 	EMS_Dead UMETA(DisplayName = "Dead"),
 
 
@@ -147,11 +148,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
 		float WalkingSpeed;
 
+	UPROPERTY(VisibleAnywhere)
 	bool bShiftKeyDown;
+
 	void ShiftKeyDown();
 	void ShiftKeyUp();
 
+	UPROPERTY(VisibleAnywhere)
 	bool bCtrlKeyDown;
+
 	void CtrlKeyDown();
 	void CtrlKeyUp();
 	/*
