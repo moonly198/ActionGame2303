@@ -522,9 +522,9 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 		if (Main->CurrentComboCount == 0)
 			Health -= DamageAmount;
 		else if (Main->CurrentComboCount == 1)
-			Health -= DamageAmount+100;
+			Health -= DamageAmount+10;
 		else if (Main->CurrentComboCount == 2)
-			Health -= DamageAmount+200;
+			Health -= DamageAmount+20;
 		
 	}
 	

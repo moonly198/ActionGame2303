@@ -637,18 +637,22 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 			LaunchCharacter(EnemyForwardDir * (DashDistance * 2) / 3, true, false);  //AttackDistance만큼 앞으로
 			AnimInstance->Montage_Play(CombatMontage, 0.9f);
 			AnimInstance->Montage_JumpToSection(FName("CriticalHitReact"), CombatMontage);
+			UGameplayStatics::PlaySound2D(this, CriticalDamagedSound);
 			bStunned = false;
 			bReadyStunned = true;
 
 		}
 		else
 		{
-			if (!bAttacking && !bDashing && !bStunned )
+			if (!bDashing && !bStunned )//&&!bAttacking)
 			{
 				LaunchCharacter(EnemyForwardDir * (DashDistance / 10), true, false); //일단 설정
 				AnimInstance->Montage_Play(CombatMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("HitReact"), CombatMontage);
+				UGameplayStatics::PlaySound2D(this, DamagedSound);
+				AttackEnd();
 			}
+
 			
 		}
 	}

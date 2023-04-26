@@ -87,6 +87,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* StunSound;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+		USoundCue* DamagedSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+		USoundCue* CriticalDamagedSound;
+
 	//공격시 에너미 쪽을 향해 캐릭터 회전
 	float InterpSpeed;
 
