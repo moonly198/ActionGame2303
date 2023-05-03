@@ -12,10 +12,25 @@ enum class EMovementStatus : uint8
 	EMS_Normal UMETA(DisplayName = "Normal"),
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
 	EMS_Walking UMETA(DisplayName = "Walking"),
-	EMS_Stun UMETA(DisplayName = "Stun"),
-	EMS_Attacking UMETA(DisplayName = "Attacking"),
-	EMS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
+	//EMS_Stun UMETA(DisplayName = "Stun"),
+	//EMS_Attacking UMETA(DisplayName = "Attacking"),
+	//EMS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
+	//EMS_TakeDamage UMETA(DisplayName = "TakeDamage"),
 	EMS_Dead UMETA(DisplayName = "Dead"),
+
+
+	EMS_MAX UMETA(DisplayName = "DefaultMAX")
+};
+
+UENUM(BlueprintType)
+enum class ECombatStatus : uint8
+{
+	ECS_Normal UMETA(DisplayName = "Normal"),
+	ECS_Stun UMETA(DisplayName = "Stun"),
+	ECS_Attacking UMETA(DisplayName = "Attacking"),
+	ECS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
+	ECS_TakeDamage UMETA(DisplayName = "TakeDamage"),
+	//ECS_Dead UMETA(DisplayName = "Dead"),
 
 
 	EMS_MAX UMETA(DisplayName = "DefaultMAX")
@@ -131,6 +146,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Enums")
 		EStaminaStatus StaminaStatus;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Enums")
+		ECombatStatus CombatStatus;
 
 	FORCEINLINE void SetStaminaStatus(EStaminaStatus status) { StaminaStatus = status; }
 
@@ -286,12 +304,17 @@ public:
 	void TravelMode();
 
 	//공격 받았을시
+	FORCEINLINE void SetCombatStatus(ECombatStatus status) { CombatStatus = status; }
 	void DecrementHealth(float Amount);
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	void Die();
 
 	UFUNCTION(BlueprintCallable)
 		void DeathEnd();
+
+	UPROPERTY(EditAnywhere, Category = "Combat")
+		float attackedDistance = 1000.f;
+
 
 	//공격
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")

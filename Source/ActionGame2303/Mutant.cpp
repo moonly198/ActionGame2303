@@ -82,6 +82,40 @@ void AMutant::BeginPlay()
 	AIController = Cast<AAIController>(GetController());
 	//Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 
+	/*
+	// AgroSphere 컴포넌트의 Collision Preset을 OverlapAllDynamic으로 변경합니다.
+	AgroSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
+
+	// 이미 오버랩된 액터들의 배열을 가져옵니다.
+	TArray<AActor*> OverlappingActors;
+	AgroSphere->GetOverlappingActors(OverlappingActors);
+
+	// 오버랩된 액터들의 처리를 수행합니다.
+	for (AActor* Actor : OverlappingActors)
+	{
+		if (Actor->IsA<AMain>())
+		{
+			AMain* Main = Cast<AMain>(Actor);
+			if (Main)
+			{
+				// Initialize CombatTarget, bHasValidTarget, MainPlayerController, and move to target
+				// 적 체력바
+				CombatTarget = Main;
+				bHasValidTarget = true;
+				Main->SetHasCombatTarget(true);
+				Main->SetCombatTarget(this);
+
+				if (Main->MainPlayerController)
+				{
+					Main->MainPlayerController->DisplayEnemyHealthBar();
+				}
+
+				MoveToTarget(Main);
+			}
+		}
+	}
+	*/
+
 	AgroSphere->OnComponentBeginOverlap.AddDynamic(this, &AMutant::AgroSphereOnOverlapBegin);
 	AgroSphere->OnComponentEndOverlap.AddDynamic(this, &AMutant::AgroSphereOnOverlapEnd);
 
@@ -111,7 +145,6 @@ void AMutant::BeginPlay()
 	FootCombatCollision->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
 	FootCombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	FootCombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
-
 	
 }
 
@@ -121,6 +154,8 @@ void AMutant::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Dead) return;
+
+
 	float DeltaStamina = StaminaDrainRate * DeltaTime;
 	if (bStunned)
 	{
@@ -197,18 +232,18 @@ void AMutant::AgroSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 		
 		if (Main)
 		{
+			bAgroShpehreOverlap = true;
 			// 적 체력바
 			CombatTarget = Main;
 			bHasValidTarget = true;
 			Main->SetHasCombatTarget(true);
 			Main->SetCombatTarget(this);
-
 			if (Main->MainPlayerController)
 			{
 				Main->MainPlayerController->DisplayEnemyHealthBar();
 			}
-
 			MoveToTarget(Main);
+			
 		}
 	}
 }
@@ -351,7 +386,7 @@ void AMutant::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAc
 			}
 			if (DamageTypeClass)
 			{
-				if (Main->MovementStatus == EMovementStatus::EMS_Stun)
+				if (Main->CombatStatus == ECombatStatus::ECS_Stun)
 				{
 					UGameplayStatics::ApplyDamage(Main, EnemyCriticalDamage, AIController, this, DamageTypeClass); //데미지 적용 Main의 TakeDamage();
 				}
@@ -428,7 +463,7 @@ void AMutant::Attack()
 		}
 		if (!bAttacking)
 		{
-			
+			UE_LOG(LogTemp, Warning, TEXT("enemyAttack!"));
 			bAttacking = true;
 			SetInterpToEnemy(true);
 
@@ -443,39 +478,41 @@ void AMutant::Attack()
 
 			if (AnimInstance)
 			{
-				
 				int32 Section = FMath::RandRange(0, 2);
 				switch (Section)
 				{
 					case 0:
-						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_Play(CombatMontage, PunchSpeed);
 						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Punch"), CombatMontage);
+						SetInterpToEnemy(false);
 						
 						break;
 
 					case 1:
-						AnimInstance->Montage_Play(CombatMontage,1.f);
+						AnimInstance->Montage_Play(CombatMontage, SwipingSpeed);
 						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Swiping"), CombatMontage);
+						SetInterpToEnemy(false);
 						
 						break;
 					case 2:
 						if (DistanceToMain <= 300.f)
 						{
-							AnimInstance->Montage_Play(CombatMontage, 1.f);
+							AnimInstance->Montage_Play(CombatMontage, SmallJumpSpeed);
 							AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
-							
+							SetInterpToEnemy(false);
 						}
 						
 						break;
 						/*
 					case 3:
-						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_Play(CombatMontage, BigJumpSpeed);
 						AnimInstance->Montage_JumpToSection(FName("MutantAttack_JumpAttack"), CombatMontage);
 						break;
 						*/
 					default:
 						;
 				}
+				
 			}
 		}
 	}
@@ -485,9 +522,11 @@ void AMutant::AttackEnd()
 {
 	bAttacking = false;
 
+	UE_LOG(LogTemp, Warning, TEXT("bAttacking no!"));
 	//CombatSphereOverlapEnd 가 실행이 됬는데 EMS_Attacking 일 경우에는 AttackEnd()에서 한번더 검사
-	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Attacking)
+	if (!bOverlappingCombatSphere && EnemyMovementStatus == EEnemyMovementStatus::EMS_Attacking)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("nono!"));
 		AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
 		MoveToTarget(Main);
 	}
@@ -500,9 +539,9 @@ void AMutant::AttackEnd()
 		GetWorldTimerManager().SetTimer(AttackTimer, this, &AMutant::Attack, AttackTime);
 	}
 
+	//SetInterpToEnemy(false);
 
 	
-	SetInterpToEnemy(false);
 
 }
 
@@ -559,6 +598,8 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	
 	const FVector MainForwordDir = Main->GetActorRotation().Vector() ; // 메인캐릭터가 가고있는 앞쪽방향
 	LaunchCharacter((MainForwordDir * AttackedDistance) /2, true, false);
+
+	//0.5초 뒤에 bTakeDamage = false;를 해줌 왜?
 	FTimerHandle aa;
 	GetWorld()->GetTimerManager().SetTimer(aa, FTimerDelegate::CreateLambda([&]()
 		{

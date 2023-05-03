@@ -138,7 +138,7 @@ void AMain::Tick(float DeltaTime)
 
 	//EMovementStatus::EMS_Stun 이고 스턴상태일때, bStunned으로로 안한 이유는 스턴애님이 바로 해제 됨 
 	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬
-	if (MovementStatus != EMovementStatus::EMS_Stun && !bReadyStunned) 
+	if (CombatStatus != ECombatStatus::ECS_Stun && !bReadyStunned)
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && StunMontage)
@@ -168,24 +168,37 @@ void AMain::Tick(float DeltaTime)
 	}
 
 	//스턴인데 공격을 당했을때 CombatMontage의 Death애님이 끝나면 일어서야함
-	if (MovementStatus == EMovementStatus::EMS_StunTakeDamage)
+	if (CombatStatus == ECombatStatus::ECS_StunTakeDamage)
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && CombatMontage)
 		{
 			if ( AnimInstance->Montage_IsPlaying(CombatMontage))
 			{
-				SetMovementStatus(EMovementStatus::EMS_StunTakeDamage);
+				SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			}
 			else if (!AnimInstance->Montage_IsPlaying(CombatMontage))
 			{
 				if (Stamina > MinSprintStamina)
 				{
-					SetMovementStatus(EMovementStatus::EMS_Normal);
+					SetCombatStatus(ECombatStatus::ECS_Normal);
 				}
 			}
 		}
 
+	}
+
+	//ECS_TakeDamage 몽타주 끝나면 노말로 넘어가야함
+	if (CombatStatus == ECombatStatus::ECS_TakeDamage)
+	{
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && CombatMontage)
+		{
+			if (!AnimInstance->Montage_IsPlaying(CombatMontage))
+			{
+				SetCombatStatus(ECombatStatus::ECS_Normal);
+			}
+		}
 	}
 
 	//대쉬몽타주가 끝났는지 bDashing이 true일때만 매 프레임마다 판단 
@@ -207,6 +220,8 @@ void AMain::Tick(float DeltaTime)
 		StaminaDelay(DeltaTime);
 	else
 		RcoveringStamina(DeltaTime);
+
+	
 	
 	
 
@@ -350,7 +365,7 @@ void AMain::Dashing()
 void AMain::Stunned()
 {
 	bReadyStunned = false;
-	MovementStatus = EMovementStatus::EMS_Stun;
+	CombatStatus = ECombatStatus::ECS_Stun;
 	SetInterpToEnemy(false);
 	UE_LOG(LogTemp, Warning, TEXT("Stun!"));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -404,8 +419,8 @@ void AMain::LMBDown()
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
 
-	if (MovementStatus == EMovementStatus::EMS_Stun ||
-		MovementStatus == EMovementStatus::EMS_StunTakeDamage)
+	if (CombatStatus == ECombatStatus::ECS_Stun ||
+		CombatStatus == ECombatStatus::ECS_StunTakeDamage)
 		return;
 	// 클릭 횟수 증가
 	ClickCount++;
@@ -472,8 +487,8 @@ void AMain::Attack()
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (!bAttacking && 
 		MovementStatus != EMovementStatus::EMS_Dead && 
-		MovementStatus != EMovementStatus::EMS_Stun &&
-		MovementStatus != EMovementStatus::EMS_StunTakeDamage &&
+		CombatStatus != ECombatStatus::ECS_Stun &&
+		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 		Stamina > 0.f )
 	{
 		Stamina -= AttackStamina; //공격시 스태미너 AttackStamina만큼 - 하기
@@ -631,9 +646,9 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		if (MovementStatus == EMovementStatus::EMS_Stun)
+		if (CombatStatus == ECombatStatus::ECS_Stun)
 		{
-			SetMovementStatus(EMovementStatus::EMS_StunTakeDamage);
+			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			LaunchCharacter(EnemyForwardDir * (DashDistance * 2) / 3, true, false);  //AttackDistance만큼 앞으로
 			AnimInstance->Montage_Play(CombatMontage, 0.9f);
 			AnimInstance->Montage_JumpToSection(FName("CriticalHitReact"), CombatMontage);
@@ -646,7 +661,8 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 		{
 			if (!bDashing && !bStunned )//&&!bAttacking)
 			{
-				LaunchCharacter(EnemyForwardDir * (DashDistance / 10), true, false); //일단 설정
+				SetCombatStatus(ECombatStatus::ECS_TakeDamage);
+				LaunchCharacter(EnemyForwardDir * attackedDistance, true, false); 
 				AnimInstance->Montage_Play(CombatMontage, 1.f);
 				AnimInstance->Montage_JumpToSection(FName("HitReact"), CombatMontage);
 				UGameplayStatics::PlaySound2D(this, DamagedSound);
@@ -674,7 +690,8 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	else
 	{
 		/*
-		if(MovementStatus == EMovementStatus::EMS_Stun)
+		if(MovementStatus == EMovementStatus::
+		_Stun)
 			Health -= CombatTarget->D;
 		else
 		*/
@@ -781,7 +798,7 @@ void AMain::RcoveringStamina(float Time)
 			}
 			else
 			{
-				if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+				if (CombatStatus != ECombatStatus::ECS_StunTakeDamage)
 				{
 					SetMovementStatus(EMovementStatus::EMS_Normal);
 				}
@@ -798,7 +815,7 @@ void AMain::RcoveringStamina(float Time)
 			{
 				Stamina += DeltaStamina;
 			}
-			if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+			if (CombatStatus != ECombatStatus::ECS_StunTakeDamage)
 			{
 				SetMovementStatus(EMovementStatus::EMS_Normal);
 			}
@@ -861,7 +878,7 @@ void AMain::RcoveringStamina(float Time)
 		}
 
 		if (!bCtrlKeyDown)
-			SetMovementStatus(EMovementStatus::EMS_Stun);
+			SetCombatStatus(ECombatStatus::ECS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
 		break;
@@ -870,22 +887,22 @@ void AMain::RcoveringStamina(float Time)
 		if (Stamina + DeltaStamina >= MinSprintStamina)
 		{
 			SetStaminaStatus(EStaminaStatus::ESS_Normal);
-			if (MovementStatus != EMovementStatus::EMS_StunTakeDamage)
+			if (CombatStatus != ECombatStatus::ECS_StunTakeDamage)
 			{
-				SetMovementStatus(EMovementStatus::EMS_Normal);
+				SetCombatStatus(ECombatStatus::ECS_Normal);
 			}	
 			Stamina += DeltaStamina;
 
 		}
 		else
 		{
-			//SetMovementStatus(EMovementStatus::EMS_Stun);
+			//SetCombatStatus(ECombatStatus::ECS_Stun);
 			Stamina += DeltaStamina;
 		}
 
 		/* 어차피 스턴 상태라 못움직임
 		if (!bCtrlKeyDown)
-			SetMovementStatus(EMovementStatus::EMS_Stun);
+			SetCombatStatus(ECombatStatus::ECS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
 		*/
@@ -903,8 +920,9 @@ bool AMain::CanMove(float Value)
 		return (Value != 0.0f) &&
 			 (!bDashing) &&
 			(!bAttacking) &&
-			MovementStatus != EMovementStatus::EMS_Stun &&
-			MovementStatus != EMovementStatus::EMS_StunTakeDamage&&
+			CombatStatus != ECombatStatus::ECS_Stun &&
+			CombatStatus != ECombatStatus::ECS_StunTakeDamage&&
+			CombatStatus != ECombatStatus::ECS_TakeDamage &&
 			(!bStunned)&&
 			!MainPlayerController->bPauseMenuVisible;
 	}

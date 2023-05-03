@@ -92,6 +92,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		float EnemyCriticalDamage;
 
+	//각 공격 애님 스피드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float PunchSpeed = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float SwipingSpeed = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float SmallJumpSpeed = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		float BigJumpSpeed = 1.f;
+
+
+
 	//공격
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		class UParticleSystem* HitParticles;
@@ -244,5 +259,6 @@ public:
 
 	void Disappear();
 
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+	bool bAgroShpehreOverlap;
 };
