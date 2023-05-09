@@ -16,7 +16,15 @@ class ACTIONGAME2303_API AMainPlayerController : public APlayerController
 
 public:
 
-	//에디터에서 UMG참조
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget> TargetingCrossHairAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* TargetingCrossHair;
+
+
+	//에디터에서 UMG 적기
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		TSubclassOf <class UUserWidget> HUDOverlayAsset;
 
@@ -54,8 +62,20 @@ public:
 	void TogglePauseMenu();
 
 	void GameModeOnly();
+
+	//타겟팅 크로스헤어
+	void DisplayTargetingCrossHair();
+
+	void RemoveTargetingCrossHair();
+
+	void ToggleTargetingCrossHair();
+
+	bool bTargetingCrossHair;
+
+	FVector EnemyLocation;
 	
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void Tick(float DeltaTime) override;
 };

@@ -12,7 +12,7 @@ enum class EMovementStatus : uint8
 	EMS_Normal UMETA(DisplayName = "Normal"),
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
 	EMS_Walking UMETA(DisplayName = "Walking"),
-	//EMS_Stun UMETA(DisplayName = "Stun"),
+	EMS_Stun UMETA(DisplayName = "Stun"),
 	//EMS_Attacking UMETA(DisplayName = "Attacking"),
 	//EMS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
 	//EMS_TakeDamage UMETA(DisplayName = "TakeDamage"),
@@ -26,11 +26,11 @@ UENUM(BlueprintType)
 enum class ECombatStatus : uint8
 {
 	ECS_Normal UMETA(DisplayName = "Normal"),
-	ECS_Stun UMETA(DisplayName = "Stun"),
+	//ECS_Stun UMETA(DisplayName = "Stun"),
 	ECS_Attacking UMETA(DisplayName = "Attacking"),
+	ECS_Targeting UMETA(DisplayName = "Targeting"),
 	ECS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
 	ECS_TakeDamage UMETA(DisplayName = "TakeDamage"),
-	//ECS_Dead UMETA(DisplayName = "Dead"),
 
 
 	EMS_MAX UMETA(DisplayName = "DefaultMAX")
@@ -74,10 +74,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class USoundCue* HitSound;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		class UBoxComponent* SwordCombatCollision;
 
+
+	//공격관련
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		float HealthDamage; 
 
@@ -99,8 +101,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* DashSound;
 
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	//	USoundCue* StunSound;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-		USoundCue* StunSound;
+		class USoundBase* StunSound;  
+
+	//AudioComponent를 쓰려면 CreateDefaultSubobject로 붙여줘야함
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Sound")
+	class UAudioComponent* StunAudioComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* DamagedSound;
@@ -119,6 +128,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		class AMutant* CombatTarget;
 
+	
 	FORCEINLINE void SetCombatTarget(AMutant* Target) { CombatTarget = Target; }
 
 	FRotator GetLookAtRotationYaw(FVector Target);
@@ -132,6 +142,9 @@ public:
 	//따라다니는 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		class UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		class USceneComponent* CameraSceneComponent;
 
 	//카메라 회전기능 회전율
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
@@ -287,12 +300,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Combat")
 	float ClickInterval = 1.f;
 
+	
 	bool bFirstClick = true;
+
 	bool bLastAttack = false;
 
 	bool bRMBDown;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+	bool bRMBFirstClick = false;
 	void RMBDown();
 	void RMBUp();
+
 
 	bool bESCDown;
 	void ESCDown();
@@ -321,6 +339,14 @@ public:
 	bool bAttacking;
 
 	void Attack();
+
+	void AttackCritical();
+
+	UFUNCTION()
+		void AttackCriticalDamage();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		bool bCriticalAttack;
 
 	UFUNCTION(BlueprintCallable)
 		void AttackEnd();
@@ -377,4 +403,53 @@ public:
 	//WeaponInstigator AController에 경험치등 여러 정보를 저장 가능하게함
 	FORCEINLINE void SetInstigator(AController* Inst) { WeaponInstigator = Inst; }
 
+	//타게팅 시스템
+	void ToggleLockOn();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
+		bool bLockOn;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+	float targetingHeightOffset; // 타게팅 됫을때 카메라 움직임
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+		AActor* lockedOnActor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+		TArray<AActor*> lockOnCandidates;
+
+	class APlayerCameraManager* CameraManager;
+
+
+
+	UFUNCTION()
+		void TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	UFUNCTION()
+		void TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LockOn")
+		UBoxComponent* TargetingBoxCollision;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
+	bool bTargetingBoxOverlap;
+
+	//타겟팅시 카메라가 돌아가는 속도
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+	float TargetingCameraInterpSpeed;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LockOn")
+		UAnimMontage* CombatMovementMontage;
+
+	/*
+	UFUNCTION()
+		void TargetingCameraBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	UFUNCTION()
+		void TargetingCameraBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LockOn")
+		UBoxComponent* TargetingCameraBoxCollision;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
+		bool bTargetingCameraBoxOverlap;
+	*/
 };

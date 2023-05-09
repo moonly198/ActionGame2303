@@ -106,10 +106,9 @@ public:
 		float BigJumpSpeed = 1.f;
 
 
-
 	//공격
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
-		class UParticleSystem* HitParticles;
+		class UParticleSystem* HitParticles; //맞을때 파티클
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 		class USoundCue* HitSound;
@@ -125,7 +124,10 @@ public:
 		USoundCue* PunchAttackSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
-		USoundCue* FootAttackSound;
+		USoundCue* SmallJumpAttackSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+		USoundCue* BigJumpAttackSound;
 
 	//각각 공격 콜리전
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
@@ -138,8 +140,6 @@ public:
 		UBoxComponent* FootCombatCollision;
 
 	//각 공격시 파티클
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
-		UParticleSystem* FootHitParticles;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UAnimMontage* CombatMontage;
@@ -156,17 +156,15 @@ public:
 		float AttackedDistance;
 
 	//Stun
-	void Stunned();
-
-	void CriticalStunned();
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stun")
 		UAnimMontage* StunMontage;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	void Stunned();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		USoundCue* StunSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float StunTime;
 
 	UPROPERTY(VisibleAnywhere)
@@ -174,8 +172,21 @@ public:
 
 	bool bWasStunned = false;
 
+	void CriticalStunned();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
+		USoundCue* CriticalStunSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
+		float CriticalStunTime;
+
 	UPROPERTY(VisibleAnywhere)
 		bool bCriticalStunned;
+
+	UPROPERTY(VisibleAnywhere)
+		bool bCriticalStunnedAnimPlay;
+
+
 
 	FTimerHandle StunTimer;
 
@@ -241,6 +252,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		bool bAttacking;
 
+	UFUNCTION(BlueprintCallable)
 	void Attack();
 
 	UFUNCTION(BlueprintCallable)

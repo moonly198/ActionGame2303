@@ -19,6 +19,8 @@
 #include "Components/BoxComponent.h"
 #include "Mutant.h"
 #include "Sound/SoundCue.h"
+#include "Sound/SoundBase.h"
+#include "Components/AudioComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -30,29 +32,43 @@ AMain::AMain()
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	// 카메라 컴포넌트를 부착할 USceneComponent 생성
+	CameraSceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("CameraSceneComponent"));
+	CameraSceneComponent->SetupAttachment(GetRootComponent());
+
 	//Creat Camera Boom(충돌이 있는 경우 플레이어를 향해 당김)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(GetRootComponent());
+	CameraBoom->SetupAttachment(CameraSceneComponent);
 	CameraBoom->TargetArmLength = 400.f; //카메라가 이 거리를 유지한채 따라감
 	CameraBoom->bUsePawnControlRotation = true; //컨트롤러 기반으로 팔이 회전함
 
-	//콜리젼 캡슐 사이즈 정하기
-	GetCapsuleComponent()->SetCapsuleSize(48.f, 105.f);
 
 	//Creat Follow Camera 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 
+	//TargetingCameraBoxCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("TargetingCameraBoxCollision"));
+	//TargetingCameraBoxCollision->SetupAttachment(CameraBoom); // 카메라를 따라가는 콜리전 박스
+
+
+	TargetingBoxCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("TargetingBoxCollision"));
+	TargetingBoxCollision->SetupAttachment(CameraBoom); // 캐릭터앞에 고정되어잇는 콜리전 박스
+
 	//Attach the camera to the end of the boom and let the boom adjust to match
 	//the controller orientation (카메라를 붐 끝에 부착하고 붐이 컨트롤러 방향에 맞게 조정되도록 한다)
 	FollowCamera->bUsePawnControlRotation = false;
+
 	//회전율 설정
 	BaseTurnRate = 65.f;
 	BaseLookUpRate = 65.f;
 
 
+	//콜리젼 캡슐 사이즈 정하기
+	GetCapsuleComponent()->SetCapsuleSize(48.f, 105.f);
+
 	SwordCombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("SwordCombatCollision"));
 	SwordCombatCollision->SetupAttachment(GetMesh(), FName("Sword_Strike"));
+
 
 	//Don't rotate when the controller rotates.
 	//Let that just affect the camera.
@@ -69,7 +85,8 @@ AMain::AMain()
 	MovementStatus = EMovementStatus::EMS_Normal;
 	StaminaStatus = EStaminaStatus::ESS_Normal;
 
-
+	StunAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("StunAudio"));
+	StunAudioComponent->SetupAttachment(GetRootComponent());
 	
 	MaxHealth = 1000.f;
 	Health = 800.f;
@@ -108,6 +125,15 @@ AMain::AMain()
 
 	bReadyStunned = true;
 
+	bLockOn = false;
+	targetingHeightOffset = 20.0f;
+	lockedOnActor = nullptr;
+	bTargetingBoxOverlap = false;
+	TargetingCameraInterpSpeed = 10.f;
+	//bTargetingCameraBoxOverlap = false;
+
+	bCriticalAttack = false;
+
 	
 }
 
@@ -127,7 +153,12 @@ void AMain::BeginPlay()
 	SwordCombatCollision->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	SwordCombatCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
 
-	
+	TargetingBoxCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::TargetingBoxOnOverlapBegin);
+	TargetingBoxCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::TargetingBoxOnOverlapEnd);
+
+	//TargetingCameraBoxCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::TargetingCameraBoxOnOverlapBegin);
+	//TargetingCameraBoxCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::TargetingCameraBoxOnOverlapEnd);
+
 }
 
 // Called every frame
@@ -137,8 +168,8 @@ void AMain::Tick(float DeltaTime)
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
 
 	//EMovementStatus::EMS_Stun 이고 스턴상태일때, bStunned으로로 안한 이유는 스턴애님이 바로 해제 됨 
-	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬
-	if (CombatStatus != ECombatStatus::ECS_Stun && !bReadyStunned)
+	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬, 스턴시 숨소리
+	if (MovementStatus != EMovementStatus::EMS_Stun && !bReadyStunned)
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && StunMontage)
@@ -148,6 +179,7 @@ void AMain::Tick(float DeltaTime)
 				if (AnimInstance->Montage_IsPlaying(StunMontage))//아직 스턴 애님이 플레이중이라면
 				{
 					AnimInstance->Montage_Stop(0.1f, StunMontage);
+					
 				}
 				
 			}
@@ -165,11 +197,31 @@ void AMain::Tick(float DeltaTime)
 			bReadyStunned = true;
 			
 		}
+		if (StunSound)
+		{
+			if (StunAudioComponent->IsPlaying())
+			{
+				StunAudioComponent->Stop();
+			}
+
+		}
+			
 	}
 
-	//스턴인데 공격을 당했을때 CombatMontage의 Death애님이 끝나면 일어서야함
+
+	//스턴인데 공격을 당했을때 숨소리 멈추고, CombatMontage의 Death애님이 끝나면 일어서야함
 	if (CombatStatus == ECombatStatus::ECS_StunTakeDamage)
 	{
+
+		if (StunSound)
+		{
+			if (StunAudioComponent->IsPlaying())
+			{
+				StunAudioComponent->Stop();
+			}
+
+		}
+
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && CombatMontage)
 		{
@@ -221,17 +273,122 @@ void AMain::Tick(float DeltaTime)
 	else
 		RcoveringStamina(DeltaTime);
 
-	
-	
-	
+	if (CombatTarget)
+	{
+		CombatTargetLocation = CombatTarget-> GetMesh()-> GetSocketLocation(FName("TargetSocket"));
+		//CombatTargetLocation = CombatTarget->GetActorLocation();//캐릭터 클래스 적의 로케이션 가져오기
+		
+		if (MainPlayerController)
+		{
+			MainPlayerController->EnemyLocation = CombatTargetLocation;
+			//UKismetSystemLibrary::DrawDebugSphere(this, MainPlayerController->EnemyLocation, 25.f, 8, FLinearColor::Red, 10.f, 1.5f);
+		}
 
+	}
+
+	if (bCriticalAttack)
+	{
+		if (CombatTarget && CombatTarget->EnemyMovementStatus != EEnemyMovementStatus::EMS_CriticalStun)
+		{
+			bCriticalAttack = false;
+		}
+	}
+	
 	if (bInterpToEnemy && CombatTarget)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("CombatToTarget"));
 		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
 		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
-
 		SetActorRotation(InterpRotation);
+		
+	}
+
+	if (bLockOn && bTargetingBoxOverlap)
+	{
+
+		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
+		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
+		SetActorRotation(InterpRotation);
+
+		
+		FRotator lookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), lockedOnActor->GetActorLocation());
+		lookAtRotation.Pitch -= targetingHeightOffset;
+		GetController()->SetControlRotation(lookAtRotation); // 컨트롤러만 돌리기 (카메라만)
+
+		
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && CombatMovementMontage)
+		{
+			float FwdAxisValue = InputComponent->GetAxisValue("MoveForward");
+			float RightAxisValue = InputComponent->GetAxisValue("MoveRight");
+			
+			if (!bAttacking)
+			{
+				if (FMath::Abs(FwdAxisValue) > FMath::Abs(RightAxisValue))
+				{
+					// 전후진 입력 우선 처리
+					if (FwdAxisValue > 0.0f)
+					{
+						// 전진 입력 처리
+						if (!AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Play(CombatMovementMontage, 0.8f);
+							AnimInstance->Montage_JumpToSection(FName("Jog_Fwd"), CombatMovementMontage);
+						}
+
+					}
+					else if (FwdAxisValue < 0.0f)
+					{
+						// 후진 입력 처리
+						if (!AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Play(CombatMovementMontage, 0.8f);
+							AnimInstance->Montage_JumpToSection(FName("Jog_Bwd"), CombatMovementMontage);
+						}
+					}
+					else
+					{
+						// 중립 상태 처리
+						if (AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Stop(0.2f, CombatMovementMontage);
+						}
+					}
+				}
+				else
+				{
+					// 좌우 입력 우선 처리
+					if (RightAxisValue > 0.0f)
+					{
+						// 우측 입력 처리
+						if (!AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Play(CombatMovementMontage, 0.8f);
+							AnimInstance->Montage_JumpToSection(FName("Jog_Right"), CombatMovementMontage);
+						}
+					}
+					else if (RightAxisValue < 0.0f)
+					{
+						// 좌측 입력 처리
+						if (!AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Play(CombatMovementMontage, 0.8f);
+							AnimInstance->Montage_JumpToSection(FName("Jog_Left"), CombatMovementMontage);
+						}
+					}
+					else
+					{
+						// 중립 상태 처리
+						if (AnimInstance->Montage_IsPlaying(CombatMovementMontage))
+						{
+							AnimInstance->Montage_Stop(0.2f, CombatMovementMontage);
+						}
+					}
+				}
+			}
+			
+		}
+		
 	}
 	
 }
@@ -285,6 +442,10 @@ void AMain::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 	PlayerInputComponent->BindAction("ESC", IE_Pressed, this, &AMain::ESCDown);
 	PlayerInputComponent->BindAction("ESC", IE_Released, this, &AMain::ESCUp);
+
+	PlayerInputComponent->BindAction("Targeting", IE_Pressed, this, &AMain::ToggleLockOn);
+
+
 }
 
 void AMain::SetMovementStatus(EMovementStatus Status)
@@ -345,18 +506,71 @@ void AMain::Dashing()
 	{
 		if ((!bDashing) && !(MainAnimInstance->bIsInAir) && (Stamina >= DashStamina) && (!bAttacking) && !bStunned) // UMainAnimInstance클래스의 bIsInAir를 써 공중에 있을때는 대쉬를 못하게 함
 		{
-			const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향
-			LaunchCharacter(ForwardDir * DashDistance, true, false);  //대쉬
+			if (!bLockOn)
+			{
+				const FVector ForwardDir = this->GetActorRotation().Vector(); // 대쉬 방향 캐릭터가 보고잇는 방향
+				LaunchCharacter(ForwardDir * DashDistance, true, false);
+
+				if (AnimInstance && DashMontage)
+				{
+					AnimInstance->Montage_Play(DashMontage, 1);
+
+				}
+			}
+			else
+			{
+				float FwdAxisValue = InputComponent->GetAxisValue("MoveForward");
+				float RightAxisValue = InputComponent->GetAxisValue("MoveRight");
+
+				//수정해야함 -> 캐릭터의 방향을 보는것이아니게 하든 아니면 캐릭터의 방향을 틱함수에서 똑바로 하게하든 해야함 삐뚤어져있음`
+				FVector DashDirection;
+				if (FMath::Abs(FwdAxisValue) > FMath::Abs(RightAxisValue))
+				{
+					// 전후진 입력 우선 처리
+					if (FwdAxisValue > 0.0f)
+					{
+						// 전진 입력 처리
+						DashDirection = this->GetActorRotation().RotateVector(FVector::ForwardVector);
+					}
+					else if (FwdAxisValue < 0.0f)
+					{
+						// 후진 입력 처리
+						DashDirection = this->GetActorRotation().RotateVector(FVector::BackwardVector);
+					}
+					else
+					{
+						// 중립 상태 처리
+						return;
+					}
+				}
+				else
+				{
+					// 좌우 입력 우선 처리
+					if (RightAxisValue > 0.0f)
+					{
+						// 우측 입력 처리
+						DashDirection = this->GetActorRotation().RotateVector(FVector::RightVector);
+					}
+					else if (RightAxisValue < 0.0f)
+					{
+						// 좌측 입력 처리
+						DashDirection = -1 * this->GetActorRotation().RotateVector(FVector::RightVector);
+					}
+					else
+					{
+						// 중립 상태 처리
+						return;
+					}
+				}
+
+				LaunchCharacter(DashDirection * DashDistance, false, false);
+				
+			}
+			
+
 			UGameplayStatics::PlaySound2D(this, DashSound);
 			Stamina -= DashStamina;
 			bDashing = true;
-
-			if (AnimInstance && DashMontage)
-			{
-				AnimInstance->Montage_Play(DashMontage, 1);
-
-			}
-
 		}
 	}
 	
@@ -365,15 +579,33 @@ void AMain::Dashing()
 void AMain::Stunned()
 {
 	bReadyStunned = false;
-	CombatStatus = ECombatStatus::ECS_Stun;
+
+	SetMovementStatus(EMovementStatus::EMS_Normal);
+	SetMovementStatus(EMovementStatus::EMS_Stun);
+
 	SetInterpToEnemy(false);
+
 	UE_LOG(LogTemp, Warning, TEXT("Stun!"));
+
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	class UMainAnimInstance* MainAnimInstance;
 	MainAnimInstance = Cast<UMainAnimInstance>(GetMesh()->GetAnimInstance());
+
+	if (StunSound)
+	{
+		if (StunAudioComponent->Sound != StunSound) 
+			StunAudioComponent->SetSound(StunSound);
+
+		if (!StunAudioComponent->IsPlaying())
+			StunAudioComponent->Play();
+
+	}
+
 	if (MainAnimInstance != nullptr)
 	{
-		UGameplayStatics::PlaySound2D(this, StunSound);
+		//UGameplayStatics::PlaySound2D(this, StunSound);
+		
+		
 		bStunned = true;
 
 		if (AnimInstance && StunMontage)
@@ -419,7 +651,7 @@ void AMain::LMBDown()
 		if (MainPlayerController->bPauseMenuVisible)
 			return;
 
-	if (CombatStatus == ECombatStatus::ECS_Stun ||
+	if (MovementStatus == EMovementStatus::EMS_Stun ||
 		CombatStatus == ECombatStatus::ECS_StunTakeDamage)
 		return;
 	// 클릭 횟수 증가
@@ -481,19 +713,78 @@ void AMain::LMBUp()
 	bLMBDown = false;
 }
 
+void AMain::RMBDown()
+{
+	if (MainPlayerController)
+		if (MainPlayerController->bPauseMenuVisible)
+			return;
+
+
+	if (MovementStatus == EMovementStatus::EMS_Stun ||
+		CombatStatus == ECombatStatus::ECS_StunTakeDamage)//||
+		//Mutant->EnemyMovementStatus != EEnemyMovementStatus::EMS_Stun)
+		return;
+
+	bRMBDown = true;
+	if (!bRMBFirstClick)
+	{
+		bRMBFirstClick = true;
+		AttackCritical();
+	}
+}
+
+void AMain::RMBUp()
+{
+	bRMBDown = false;
+	bRMBFirstClick = false;
+}
+
+void AMain::AttackCritical()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (!bAttacking &&
+		MovementStatus != EMovementStatus::EMS_Dead &&
+		MovementStatus != EMovementStatus::EMS_Stun &&
+		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
+		CombatTarget !=nullptr&&
+		CombatTarget->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun&&
+		Stamina > 0.f &&
+		!bCriticalAttack)
+	{
+		bCriticalAttack = true;
+		Stamina -= AttackStamina;
+		bAttacking = true;
+		SetInterpToEnemy(true);
+		UE_LOG(LogTemp, Warning, TEXT("Critical Attack!!"));
+		if (AnimInstance && CombatMontage)
+		{
+			AnimInstance->Montage_Play(CombatMontage, 1.f);
+			AnimInstance->Montage_JumpToSection(FName("CriticalAttack2"), CombatMontage);
+		}
+
+	}
+}
+
+void AMain::AttackCriticalDamage()
+{
+
+}
+
 void AMain::Attack()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Attack!!"));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (!bAttacking && 
 		MovementStatus != EMovementStatus::EMS_Dead && 
-		CombatStatus != ECombatStatus::ECS_Stun &&
+		MovementStatus != EMovementStatus::EMS_Stun &&
 		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 		Stamina > 0.f )
 	{
 		Stamina -= AttackStamina; //공격시 스태미너 AttackStamina만큼 - 하기
 		bAttacking = true;
-		SetInterpToEnemy(true);
+
+		if(!bLockOn)
+			SetInterpToEnemy(true);
 
 		
 		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
@@ -566,6 +857,8 @@ void AMain::Attack()
 
 void AMain::AttackEnd()
 {
+
+	UE_LOG(LogTemp, Warning, TEXT("Attack End!!"));
 	bAttacking = false;
 	SetInterpToEnemy(false);
 	bFirstClick = true;
@@ -573,10 +866,10 @@ void AMain::AttackEnd()
 	CurrentComboCount = 0;
 
 	
-	if (bLMBDown)
-	{
-		Attack();
-	}
+	//if (bLMBDown)
+	//{
+	//	Attack();
+	//}
 	
 }
 
@@ -596,6 +889,7 @@ void AMain::StaminaDelay(float Time)
 		{
 			SetStaminaStatus(EStaminaStatus::ESS_Exhausted);
 			Stamina = 0.f;
+			
 			Stunned();
 		}
 		break;
@@ -646,10 +940,10 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		if (CombatStatus == ECombatStatus::ECS_Stun)
+		if (MovementStatus == EMovementStatus::EMS_Stun)
 		{
 			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
-			LaunchCharacter(EnemyForwardDir * (DashDistance * 2) / 3, true, false);  //AttackDistance만큼 앞으로
+			LaunchCharacter(EnemyForwardDir * attackedDistance * 3, true, false);  //AttackDistance만큼 앞으로
 			AnimInstance->Montage_Play(CombatMontage, 0.9f);
 			AnimInstance->Montage_JumpToSection(FName("CriticalHitReact"), CombatMontage);
 			UGameplayStatics::PlaySound2D(this, CriticalDamagedSound);
@@ -721,16 +1015,6 @@ void AMain::DeathEnd()
 {
 	GetMesh()->bPauseAnims = true;
 	GetMesh()->bNoSkeletonUpdate = true;
-}
-
-void AMain::RMBDown()
-{
-
-}
-
-void AMain::RMBUp()
-{
-
 }
 
 void AMain::ESCDown()
@@ -878,7 +1162,7 @@ void AMain::RcoveringStamina(float Time)
 		}
 
 		if (!bCtrlKeyDown)
-			SetCombatStatus(ECombatStatus::ECS_Stun);
+			SetMovementStatus(EMovementStatus::EMS_Stun);
 		else
 			SetMovementStatus(EMovementStatus::EMS_Walking);
 		break;
@@ -890,6 +1174,7 @@ void AMain::RcoveringStamina(float Time)
 			if (CombatStatus != ECombatStatus::ECS_StunTakeDamage)
 			{
 				SetCombatStatus(ECombatStatus::ECS_Normal);
+				SetMovementStatus(EMovementStatus::EMS_Normal);
 			}	
 			Stamina += DeltaStamina;
 
@@ -920,7 +1205,7 @@ bool AMain::CanMove(float Value)
 		return (Value != 0.0f) &&
 			 (!bDashing) &&
 			(!bAttacking) &&
-			CombatStatus != ECombatStatus::ECS_Stun &&
+			MovementStatus != EMovementStatus::EMS_Stun &&
 			CombatStatus != ECombatStatus::ECS_StunTakeDamage&&
 			CombatStatus != ECombatStatus::ECS_TakeDamage &&
 			(!bStunned)&&
@@ -934,11 +1219,12 @@ void AMain::MoveForward(float Value)
 	bMovingForward = false;
 	if (CanMove(Value))
 	{
-		//앞으로 가는 방향 설정 (const는 바꾸지 않을 것에 사용)
+		//앞으로 가는 방향 설정 (const는 바꾸지 않을 것에 사용)(FRotator, FVector 앞에 const가 다 있었음)
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0.f, Rotation.Yaw, 0.f);
 
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		
 		AddMovementInput(Direction, Value);
 
 		bMovingForward = true;
@@ -956,6 +1242,7 @@ void AMain::MoveRight(float Value)
 		const FRotator YawRotation(0.f, Rotation.Yaw, 0.f);
 
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		
 		AddMovementInput(Direction, Value);
 
 		bMovingRight = true;
@@ -1034,3 +1321,129 @@ void AMain::DeactivateCollision()
 {
 	SwordCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
+
+void AMain::ToggleLockOn()
+{
+	
+	if (MainPlayerController)
+	{
+		
+		if (bTargetingBoxOverlap)
+		{
+			MainPlayerController->ToggleTargetingCrossHair();
+			if (bLockOn)
+			{
+				SetCombatStatus(ECombatStatus::ECS_Normal);
+				bLockOn = false;
+				lockedOnActor = nullptr;
+			}
+			else
+			{
+				SetCombatStatus(ECombatStatus::ECS_Targeting);
+
+				if (lockOnCandidates.Num() > 0)
+				{
+					lockedOnActor = lockOnCandidates[0];
+					if (lockedOnActor)
+					{
+						bLockOn = true;
+					}
+				}
+			}
+		}
+		
+	}
+
+}
+
+void AMain::TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor)
+	{
+		AMutant* Mutant = Cast<AMutant>(OtherActor);
+
+		if (Mutant)
+		{
+			bTargetingBoxOverlap = true;
+			lockOnCandidates.AddUnique(Mutant);
+
+			SetHasCombatTarget(true);
+			SetCombatTarget(Mutant);
+
+			// 현재 잡히는 뮤턴트의 개수 출력
+			UE_LOG(LogTemp, Warning, TEXT("current Mutant: %d"), lockOnCandidates.Num());
+
+		}
+	}
+}
+
+void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+
+	if (OtherActor)
+	{
+		AMutant* Mutant = Cast<AMutant>(OtherActor);
+		if (Mutant) 
+		{
+			bTargetingBoxOverlap = false;
+			lockOnCandidates.Remove(Mutant);
+
+			if (!Mutant->bAgroShpehreOverlap)//뮤턴트의 어그로 스피어 밖일때
+			{
+				SetHasCombatTarget(false);
+				SetCombatTarget(nullptr);
+
+				//락온을 강제해제 시킴
+				Mutant->CombatTarget = nullptr;
+				if (MainPlayerController)
+				{
+					MainPlayerController->RemoveTargetingCrossHair();
+				}
+				bLockOn = false;
+
+			}
+			
+			
+		}
+	}
+}
+
+/*
+//카메라에 부착된 박스 콜리전
+void AMain::TargetingCameraBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+
+	if (OtherActor)
+	{
+		AMutant* Mutant = Cast<AMutant>(OtherActor);
+
+		if (Mutant)
+		{
+			bTargetingCameraBoxOverlap = true;
+			SetHasCombatTarget(true);
+			SetCombatTarget(Mutant);
+
+			// 현재 잡히는 뮤턴트의 개수 출력
+			UE_LOG(LogTemp, Warning, TEXT("현재 잡히는 뮤턴트의 개수: %d"), lockOnCandidates.Num());
+
+			lockOnCandidates.AddUnique(Mutant);
+		}
+	}
+}
+
+void AMain::TargetingCameraBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (OtherActor)
+	{
+		AMutant* Mutant = Cast<AMutant>(OtherActor);
+		if (Mutant && !Mutant->bAgroShpehreOverlap)
+		{
+
+			bTargetingCameraBoxOverlap = false;
+			SetHasCombatTarget(false);
+			SetCombatTarget(nullptr);
+
+		}
+	}
+}
+*/
