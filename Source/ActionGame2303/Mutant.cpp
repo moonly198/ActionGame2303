@@ -169,9 +169,9 @@ void AMutant::Tick(float DeltaTime)
 
 
 	float DeltaStamina = StaminaDrainRate * DeltaTime;
-	if (bStunned)
+	//if (bStunned)
 	{
-		Rigid();
+		//Rigid();
 
 	}
 	
@@ -607,11 +607,19 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	}
 	else
 	{
-		if (Main->CurrentComboCount == 0)
+		
+		if (bCriticalStunned && Main->bCriticalAttack)
+		{
+			DamageAmount = Main->CriticalHealthDamage;
 			Health -= DamageAmount;
+		}
+		else if (Main->CurrentComboCount == 0)
+			Health -= DamageAmount;
+
+	
 	
 	}
-	
+
 	DamageAmount = Main->StaminaDamage;
 	//Stamina
 	if (Stamina - DamageAmount <= 0.f)
@@ -645,12 +653,11 @@ float AMutant::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageE
 	}
 	
 	
-	if (!bCriticalStunned)
+	if (bStunned)
 	{
-		const FVector MainForwordDir = Main->GetActorRotation().Vector(); // 메인캐릭터가 가고있는 앞쪽방향
-		LaunchCharacter((MainForwordDir * AttackedDistance) / 2, true, false);
+		Rigid();
 	}
-	
+
 
 	//0.5초 뒤에 bTakeDamage = false;를 해줌 왜?
 	FTimerHandle aa;
@@ -798,6 +805,10 @@ void AMutant::Rigid()
 		{
 			AnimInstance->Montage_Play(StunMontage, 1.f);
 			AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);
+
+			AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+			const FVector MainForwordDir = Main->GetActorRotation().Vector(); // 메인캐릭터가 가고있는 앞쪽방향
+			LaunchCharacter((MainForwordDir * AttackedDistance) / 2, true, false);
 		}
 		
 		/* 일반 공격시 경직을 먹이고 싶을때 

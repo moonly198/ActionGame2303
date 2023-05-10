@@ -130,6 +130,8 @@ AMain::AMain()
 	lockedOnActor = nullptr;
 	bTargetingBoxOverlap = false;
 	TargetingCameraInterpSpeed = 10.f;
+	TargetingCameraPitchInterpSpeed = 10.f;
+	MainToLockActorDistance = 500.f;
 	//bTargetingCameraBoxOverlap = false;
 
 	bCriticalAttack = false;
@@ -145,6 +147,7 @@ void AMain::BeginPlay()
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
 
+
 	SwordCombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
 	SwordCombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
 
@@ -155,6 +158,7 @@ void AMain::BeginPlay()
 
 	TargetingBoxCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::TargetingBoxOnOverlapBegin);
 	TargetingBoxCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::TargetingBoxOnOverlapEnd);
+	//TargetingBoxCollision->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Block);
 
 	//TargetingCameraBoxCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::TargetingCameraBoxOnOverlapBegin);
 	//TargetingCameraBoxCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::TargetingCameraBoxOnOverlapEnd);
@@ -305,15 +309,32 @@ void AMain::Tick(float DeltaTime)
 
 	if (bLockOn && bTargetingBoxOverlap)
 	{
-
+		//캐릭터 회전
 		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
 		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
 		SetActorRotation(InterpRotation);
 
-		
+		//카메라 회전
+		FVector LockActorLocation = lockedOnActor->GetActorLocation();
+		FVector MainLocation = this->GetActorLocation();
+		float Distance = (LockActorLocation - MainLocation).Size();
+
 		FRotator lookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), lockedOnActor->GetActorLocation());
-		lookAtRotation.Pitch -= targetingHeightOffset;
-		GetController()->SetControlRotation(lookAtRotation); // 컨트롤러만 돌리기 (카메라만)
+		
+
+		if (!bLockOn)
+		{
+			FRotator InterpRotation1 = FMath::RInterpTo(GetActorRotation(), lookAtRotation, DeltaTime, TargetingCameraInterpSpeed);
+			GetController()->SetControlRotation(InterpRotation1); // 락온이 안되어있을때는 부드럽게 옮기기
+		}
+		else
+		{
+			if (Distance <= MainToLockActorDistance) // 락 대상과 메인의 거리가 일정량 이하가 되면 자연스럽게 카메라가 고정되야함
+			{
+				lookAtRotation.Pitch -= targetingHeightOffset;	
+			}
+			GetController()->SetControlRotation(lookAtRotation); // 컨트롤러만 돌리기 (카메라만)
+		}
 
 		
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -767,7 +788,7 @@ void AMain::AttackCritical()
 
 void AMain::AttackCriticalDamage()
 {
-
+	
 }
 
 void AMain::Attack()
@@ -1301,7 +1322,7 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 			
 			if (DamageTypeClass)
 			{
-				UGameplayStatics::ApplyDamage(Enemy, HealthDamage, (StaminaDamage, MaxStaminaDamage, WeaponInstigator), this, DamageTypeClass);
+				UGameplayStatics::ApplyDamage(Enemy, HealthDamage, (CriticalHealthDamage, StaminaDamage, MaxStaminaDamage, WeaponInstigator), this, DamageTypeClass);
 			}
 		}
 	}
@@ -1390,11 +1411,12 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 
 			if (!Mutant->bAgroShpehreOverlap)//뮤턴트의 어그로 스피어 밖일때
 			{
+				//락온을 강제해제 시킴
 				SetHasCombatTarget(false);
 				SetCombatTarget(nullptr);
 
-				//락온을 강제해제 시킴
 				Mutant->CombatTarget = nullptr;
+
 				if (MainPlayerController)
 				{
 					MainPlayerController->RemoveTargetingCrossHair();

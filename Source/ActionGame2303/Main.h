@@ -84,6 +84,9 @@ public:
 		float HealthDamage; 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		float CriticalHealthDamage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		float StaminaDamage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
@@ -436,6 +439,12 @@ public:
 	//타겟팅시 카메라가 돌아가는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
 	float TargetingCameraInterpSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+		float TargetingCameraPitchInterpSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+	float MainToLockActorDistance;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LockOn")
 		UAnimMontage* CombatMovementMontage;
