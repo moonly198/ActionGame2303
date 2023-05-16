@@ -47,6 +47,50 @@ void AMainPlayerController::BeginPlay()
 		//EnemyHealthBar->SetAlignmentInViewport(Alignment);
 	}
 
+	//힌트위젯 추가하기
+	if (Hint1Asset)
+	{
+		Hint1 = CreateWidget<UUserWidget>(this, Hint1Asset);
+		if (Hint1)
+		{
+			Hint1->AddToViewport();
+			Hint1->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
+
+	if (Hint2Asset)
+	{
+		Hint2 = CreateWidget<UUserWidget>(this, Hint2Asset);
+		if (Hint2)
+		{
+			Hint2->AddToViewport();
+			Hint2->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
+
+	if (Hint3Asset)
+	{
+		Hint3 = CreateWidget<UUserWidget>(this, Hint3Asset);
+		if (Hint3)
+		{
+			Hint3->AddToViewport();
+			Hint3->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
+
+
+	if (WidgetTriggerAsset)
+	{
+		WidgetTrigger = CreateWidget<UUserWidget>(this, WidgetTriggerAsset);
+		if (WidgetTrigger)
+		{
+			WidgetTrigger->AddToViewport();
+			WidgetTrigger->SetVisibility(ESlateVisibility::Hidden); // 가시성 설정
+			WidgetTriggerList.Add(WidgetTrigger);
+		}
+	}
+
+
 	
 	if (WPauseMenu)
 	{
@@ -106,11 +150,7 @@ void AMainPlayerController::DisplayPauseMenu_Implementation()
 		bPauseMenuVisible = true;
 		PauseMenu->SetVisibility(ESlateVisibility::Visible); // 가시성 설정
 
-		FInputModeGameAndUI InputModeGameAndUI;
-
-		SetInputMode(InputModeGameAndUI);
-		bShowMouseCursor = true;
-
+		GameAndUI();
 	}
 }
 
@@ -119,7 +159,6 @@ void AMainPlayerController::RemovePauseMenu_Implementation()
 	if (PauseMenu)
 	{
 		GameModeOnly();
-		bShowMouseCursor = false;
 
 		bPauseMenuVisible = false;
 		PauseMenu->SetVisibility(ESlateVisibility::Hidden); // 가시성 설정
@@ -144,6 +183,18 @@ void AMainPlayerController::GameModeOnly()
 	FInputModeGameOnly InputModeGameOnly;
 
 	SetInputMode(InputModeGameOnly);
+	bShowMouseCursor = false;
+	UE_LOG(LogTemp, Warning, TEXT("GameModeOnly"));
+}
+
+void AMainPlayerController::GameAndUI()
+{
+
+	FInputModeGameAndUI InputModeGameAndUI;
+
+	SetInputMode(InputModeGameAndUI);
+	bShowMouseCursor = true;
+	UE_LOG(LogTemp, Warning, TEXT("GameAndUI"));
 }
 
 void AMainPlayerController::DisplayTargetingCrossHair()
@@ -153,7 +204,6 @@ void AMainPlayerController::DisplayTargetingCrossHair()
 	{
 		bTargetingCrossHair = true;
 		TargetingCrossHair->SetVisibility(ESlateVisibility::Visible); // 가시성 설정
-		UE_LOG(LogTemp, Warning, TEXT("target"))
 	}
 }
 
@@ -163,7 +213,6 @@ void AMainPlayerController::RemoveTargetingCrossHair()
 	{
 		bTargetingCrossHair = false;
 		TargetingCrossHair->SetVisibility(ESlateVisibility::Hidden); // 가시성 설정
-		UE_LOG(LogTemp, Warning, TEXT("no target!"))
 	}
 }
 
@@ -172,12 +221,10 @@ void AMainPlayerController::ToggleTargetingCrossHair()
 {
 	if (bTargetingCrossHair)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("I Dont See!"))
 		RemoveTargetingCrossHair();
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("I See!"))
 		DisplayTargetingCrossHair();
 	}
 }

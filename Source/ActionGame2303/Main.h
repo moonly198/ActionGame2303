@@ -128,13 +128,31 @@ public:
 
 	void SetInterpToEnemy(bool Interp);
 
+	FRotator GetLookAtRotationYaw(FVector Target);
+
+	/*
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		class AMutant* CombatTarget;
 
-	
 	FORCEINLINE void SetCombatTarget(AMutant* Target) { CombatTarget = Target; }
+	*/
 
-	FRotator GetLookAtRotationYaw(FVector Target);
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		class ACharacter* CombatTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+		TArray<ACharacter*> CombatTargetList;
+	
+	FORCEINLINE void SetCombatTarget(ACharacter* Target) { CombatTarget = Target; }
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		class AMutant* Mutant;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+		class ADummy* Dummy;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat") // 임시
+		int a;
 
 	
 
@@ -351,6 +369,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 		bool bCriticalAttack;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+	bool bCriticalAttackOnce = false;
+
 	UFUNCTION(BlueprintCallable)
 		void AttackEnd();
 
@@ -412,14 +433,23 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
 		bool bLockOn;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
+		bool bWasLockOn;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
+	bool bInterpToTargetRotation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "LockOn")
 	float targetingHeightOffset; // 타게팅 됫을때 카메라 움직임
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		AActor* lockedOnActor;
+		float stopAngle; // 타게팅 됫을때 카메라 멈춤 각도
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		TArray<AActor*> lockOnCandidates;
+		ACharacter* lockedOnActor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
+		TArray<ACharacter*> lockOnCandidates;
 
 	class APlayerCameraManager* CameraManager;
 
@@ -439,9 +469,6 @@ public:
 	//타겟팅시 카메라가 돌아가는 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
 	float TargetingCameraInterpSpeed;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		float TargetingCameraPitchInterpSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
 	float MainToLockActorDistance;

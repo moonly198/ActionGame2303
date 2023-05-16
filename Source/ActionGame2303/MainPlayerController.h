@@ -61,7 +61,11 @@ public:
 
 	void TogglePauseMenu();
 
+	UFUNCTION(BlueprintCallable)
 	void GameModeOnly();
+
+	UFUNCTION(BlueprintCallable)
+	void GameAndUI();
 
 	//타겟팅 크로스헤어
 	void DisplayTargetingCrossHair();
@@ -73,6 +77,36 @@ public:
 	bool bTargetingCrossHair;
 
 	FVector EnemyLocation;
+
+
+	//위젯트리거박스
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget>WidgetTriggerAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* WidgetTrigger;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TArray<UUserWidget*> WidgetTriggerList;
+
+	//hints
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget> Hint1Asset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* Hint1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget> Hint2Asset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* Hint2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		TSubclassOf<class UUserWidget> Hint3Asset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		UUserWidget* Hint3;
 	
 protected:
 	virtual void BeginPlay() override;

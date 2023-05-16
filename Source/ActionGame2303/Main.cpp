@@ -25,6 +25,8 @@
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "HealthDamageType.h"
+#include "Engine/EngineTypes.h"
+#include "Dummy.h"
 
 // Sets default values
 AMain::AMain()
@@ -126,17 +128,16 @@ AMain::AMain()
 	bReadyStunned = true;
 
 	bLockOn = false;
-	targetingHeightOffset = 20.0f;
+	bWasLockOn = false;
+	targetingHeightOffset = 0.0f;
+	stopAngle = 25.0f;
 	lockedOnActor = nullptr;
 	bTargetingBoxOverlap = false;
 	TargetingCameraInterpSpeed = 10.f;
-	TargetingCameraPitchInterpSpeed = 10.f;
 	MainToLockActorDistance = 500.f;
 	//bTargetingCameraBoxOverlap = false;
 
 	bCriticalAttack = false;
-
-	
 }
 
 
@@ -147,6 +148,14 @@ void AMain::BeginPlay()
 
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
 
+	AActor* FoundActor1 = UGameplayStatics::GetActorOfClass(GetWorld(), AMutant::StaticClass());
+	Mutant = Cast<AMutant>(FoundActor1);
+	
+	
+	AActor* FoundActor2 = UGameplayStatics::GetActorOfClass(GetWorld(), ADummy::StaticClass());
+	Dummy = Cast<ADummy>(FoundActor2);
+	
+	
 
 	SwordCombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
 	SwordCombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
@@ -170,6 +179,12 @@ void AMain::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
+
+	//임시
+	if (CombatTarget == Mutant)
+		a = 0;
+	else if(CombatTarget == Dummy)
+		a = 1;
 
 	//EMovementStatus::EMS_Stun 이고 스턴상태일때, bStunned으로로 안한 이유는 스턴애님이 바로 해제 됨 
 	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬, 스턴시 숨소리
@@ -292,54 +307,113 @@ void AMain::Tick(float DeltaTime)
 
 	if (bCriticalAttack)
 	{
-		if (CombatTarget && CombatTarget->EnemyMovementStatus != EEnemyMovementStatus::EMS_CriticalStun)
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+		if (AnimInstance && CombatMontage)
 		{
-			bCriticalAttack = false;
+			if (!AnimInstance->Montage_IsPlaying(CombatMontage))
+			{
+				bCriticalAttack = false;
+			}
 		}
 	}
 	
 	if (bInterpToEnemy && CombatTarget)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("CombatToTarget"));
-		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
+		//FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation()); //원래거
+		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetMesh()->GetSocketLocation(FName("TargetSocket")));
 		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
 		SetActorRotation(InterpRotation);
 		
 	}
 
-	if (bLockOn && bTargetingBoxOverlap)
+
+	if (bWasLockOn != bLockOn) // bLockOn 값이 변경되었는지 확인
 	{
-		//캐릭터 회전
-		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetActorLocation());
-		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
-		SetActorRotation(InterpRotation);
-
-		//카메라 회전
-		FVector LockActorLocation = lockedOnActor->GetActorLocation();
-		FVector MainLocation = this->GetActorLocation();
-		float Distance = (LockActorLocation - MainLocation).Size();
-
-		FRotator lookAtRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), lockedOnActor->GetActorLocation());
-		
-
-		if (!bLockOn)
+		if (bLockOn)
 		{
-			FRotator InterpRotation1 = FMath::RInterpTo(GetActorRotation(), lookAtRotation, DeltaTime, TargetingCameraInterpSpeed);
-			GetController()->SetControlRotation(InterpRotation1); // 락온이 안되어있을때는 부드럽게 옮기기
+			// RInterpTo 함수 호출 시작
+			bInterpToTargetRotation = true;
 		}
 		else
 		{
-			if (Distance <= MainToLockActorDistance) // 락 대상과 메인의 거리가 일정량 이하가 되면 자연스럽게 카메라가 고정되야함
-			{
-				lookAtRotation.Pitch -= targetingHeightOffset;	
-			}
-			GetController()->SetControlRotation(lookAtRotation); // 컨트롤러만 돌리기 (카메라만)
+			// RInterpTo 함수 호출 중지
+			bInterpToTargetRotation = false;
 		}
 
+	}
+	bWasLockOn = bLockOn; // 이전 프레임의 bLockOn 값 저장
+
+	if (bLockOn && bTargetingBoxOverlap && CombatTarget)
+	{
+		//캐릭터 회전
+		FRotator LookAtYaw = GetLookAtRotationYaw(CombatTarget->GetMesh()->GetSocketLocation(FName("TargetSocket")));
+		FRotator InterpRotation = FMath::RInterpTo(GetActorRotation(), LookAtYaw, DeltaTime, InterpSpeed);
+		SetActorRotation(InterpRotation);
+
+		FRotator TargetRotation;
+
+		//if (CombatTarget->bCriticalStunned)
+		if (Mutant && Mutant->bCriticalStunned)
+			TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), CombatTarget->GetMesh()->GetSocketLocation(FName("TargetSocket")));
+		else
+			TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), CombatTarget->GetActorLocation());
+
 		
+		
+		// 락온시 카메라 회전
+		//FVector LockActorLocation = lockedOnActor->GetActorLocation();
+		if (lockedOnActor == CombatTarget && !bInterpToTargetRotation)
+		{
+			FVector LockActorLocation = lockedOnActor->GetActorLocation();
+			FVector MainLocation = this->GetActorLocation();
+			float CurrentDistance = (LockActorLocation - MainLocation).Size();
+
+				targetingHeightOffset = TargetRotation.Pitch;
+				if (CurrentDistance <= MainToLockActorDistance) // 락 대상과 메인의 거리가 일정량 이하가 되면 자연스럽게 카메라가 고정되야함
+				{
+					
+					targetingHeightOffset -= 0.5;
+					TargetRotation.Pitch -= targetingHeightOffset;
+					
+					if (targetingHeightOffset > stopAngle)
+					{
+						targetingHeightOffset = stopAngle;
+					}
+				}
+				else
+				{
+					targetingHeightOffset += 0.5;
+					TargetRotation.Pitch -= targetingHeightOffset;
+
+					if (targetingHeightOffset < 0)
+					{
+						targetingHeightOffset = 0;
+					}
+
+				}
+				GetController()->SetControlRotation(TargetRotation); // 컨트롤러만 돌리기 (카메라만)
+		}
+
+		//처음 락온시 카메라 회전
+		if (bInterpToTargetRotation)
+		{
+			FRotator InterpCameraRotation = FMath::RInterpTo(GetControlRotation(), TargetRotation, DeltaTime, TargetingCameraInterpSpeed);
+			GetController()->SetControlRotation(InterpCameraRotation);
+
+			if (FMath::IsNearlyEqual(GetControlRotation().Pitch, TargetRotation.Pitch, 20.f)
+				&& FMath::IsNearlyEqual(GetControlRotation().Yaw, TargetRotation.Yaw, 20.f)
+				&& FMath::IsNearlyEqual(GetControlRotation().Roll, TargetRotation.Roll, 20.f))
+			{
+				bInterpToTargetRotation = false;  // 보간 종료
+			}
+		}
+
+		//락온시 이동 애니메이션 설정
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && CombatMovementMontage)
 		{
+			ShiftKeyUp();
 			float FwdAxisValue = InputComponent->GetAxisValue("MoveForward");
 			float RightAxisValue = InputComponent->GetAxisValue("MoveRight");
 			
@@ -411,6 +485,8 @@ void AMain::Tick(float DeltaTime)
 		}
 		
 	}
+
+
 	
 }
 
@@ -768,11 +844,14 @@ void AMain::AttackCritical()
 		MovementStatus != EMovementStatus::EMS_Stun &&
 		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 		CombatTarget !=nullptr&&
-		CombatTarget->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun&&
+		(Mutant->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun ||
+			Dummy->DummyMovementStatus == EDummyMovementStatus::DMS_CriticalStun)&&
 		Stamina > 0.f &&
-		!bCriticalAttack)
+		!bCriticalAttack&&
+		!bCriticalAttackOnce)
 	{
 		bCriticalAttack = true;
+		bCriticalAttackOnce = true;
 		Stamina -= AttackStamina;
 		bAttacking = true;
 		SetInterpToEnemy(true);
@@ -844,6 +923,8 @@ void AMain::Attack()
 				bLastAttack = true;
 			}
 		}
+		
+		
 	}
 
 	
@@ -1229,6 +1310,7 @@ bool AMain::CanMove(float Value)
 			MovementStatus != EMovementStatus::EMS_Stun &&
 			CombatStatus != ECombatStatus::ECS_StunTakeDamage&&
 			CombatStatus != ECombatStatus::ECS_TakeDamage &&
+			!bCriticalAttack &&
 			(!bStunned)&&
 			!MainPlayerController->bPauseMenuVisible;
 	}
@@ -1301,24 +1383,50 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 {
 	if (OtherActor)
 	{
-		AMutant* Enemy = Cast<AMutant>(OtherActor);
+		//AMutant* Enemy = Cast<AMutant>(OtherActor);
+		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
 		if (Enemy)
 		{
-			if (Enemy->HitParticles)
+			FHitResult EnemyHitResult = SweepResult;
+			if (!EnemyHitResult.bBlockingHit) //일단 false에서 되게 함.. true 에서 안되서.. 무기가 메쉬를 몇번을 스치든 한대만 때릴수 있게 함
 			{
-				const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("Sword_Blood");
-				if (WeaponSocket)
+				DeactivateCollision();
+			}
+			const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("Sword_Blood");
+			if (WeaponSocket)
+			{
+				//actor(MyProject의Weapon.cpp)는 Skeletalmesh를 받고 char는 GetMesh()
+				FVector SocketLocation = WeaponSocket->GetSocketLocation(GetMesh());
+
+
+				if (CombatTarget == Mutant)
 				{
-					//actor(MyProject의Weapon.cpp)는 Skeletalmesh를 받고 char는 GetMesh()
-					FVector SocketLocation = WeaponSocket->GetSocketLocation(GetMesh()); 
-					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Enemy->HitParticles, SocketLocation, FRotator(0.f), false);
+					if (Mutant->HitParticles)
+					{
+						UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Mutant->HitParticles, SocketLocation, FRotator(0.f), false);
+
+					}
+
+					if (Mutant->HitSound)
+					{
+						UGameplayStatics::PlaySound2D(this, Mutant->HitSound);
+					}
+				}
+				else if (CombatTarget == Dummy)
+				{
+					if (Dummy->HitParticles)
+					{
+						UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Dummy->HitParticles, SocketLocation, FRotator(0.f), false);
+						
+					}
+					if (Dummy->HitSound)
+					{
+						UGameplayStatics::PlaySound2D(this, Dummy->HitSound);
+					}
+
 				}
 			}
-			if (Enemy->HitSound)
-			{
-				UGameplayStatics::PlaySound2D(this, Enemy->HitSound);
-			}
-
+			
 			
 			if (DamageTypeClass)
 			{
@@ -1349,7 +1457,7 @@ void AMain::ToggleLockOn()
 	if (MainPlayerController)
 	{
 		
-		if (bTargetingBoxOverlap)
+		if (bTargetingBoxOverlap && CombatTarget)
 		{
 			MainPlayerController->ToggleTargetingCrossHair();
 			if (bLockOn)
@@ -1360,6 +1468,7 @@ void AMain::ToggleLockOn()
 			}
 			else
 			{
+
 				SetCombatStatus(ECombatStatus::ECS_Targeting);
 
 				if (lockOnCandidates.Num() > 0)
@@ -1381,15 +1490,15 @@ void AMain::TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 {
 	if (OtherActor)
 	{
-		AMutant* Mutant = Cast<AMutant>(OtherActor);
-
-		if (Mutant)
+		//AMutant* Enemy = Cast<AMutant>(OtherActor);
+		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
+		if (Enemy)
 		{
 			bTargetingBoxOverlap = true;
-			lockOnCandidates.AddUnique(Mutant);
+			lockOnCandidates.AddUnique(Enemy);
 
 			SetHasCombatTarget(true);
-			SetCombatTarget(Mutant);
+			SetCombatTarget(Enemy);
 
 			// 현재 잡히는 뮤턴트의 개수 출력
 			UE_LOG(LogTemp, Warning, TEXT("current Mutant: %d"), lockOnCandidates.Num());
@@ -1403,11 +1512,12 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 
 	if (OtherActor)
 	{
-		AMutant* Mutant = Cast<AMutant>(OtherActor);
-		if (Mutant) 
+		//AMutant* Enemy = Cast<AMutant>(OtherActor);
+		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
+		if (Enemy)
 		{
 			bTargetingBoxOverlap = false;
-			lockOnCandidates.Remove(Mutant);
+			lockOnCandidates.Remove(Enemy);
 
 			if (!Mutant->bAgroShpehreOverlap)//뮤턴트의 어그로 스피어 밖일때
 			{

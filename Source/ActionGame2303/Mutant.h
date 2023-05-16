@@ -180,7 +180,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float CriticalStunTime;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Stun")
 		bool bCriticalStunned;
 
 	UPROPERTY(VisibleAnywhere)
@@ -274,4 +274,5 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	bool bAgroShpehreOverlap;
+
 };
