@@ -55,20 +55,22 @@ void AWidgetTrigger::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AA
 	AMain* Main = Cast<AMain>(OtherActor);
 	AMainPlayerController* MPC = Cast<AMainPlayerController>(Main->GetController());
 
-	if (WidgetAsset)
-	{
-
-		Widget = CreateWidget<UUserWidget>(MPC, WidgetAsset);
-		if (Widget)
-		{
-			Widget->AddToViewport();
-			Widget->SetVisibility(ESlateVisibility::Hidden);
-			//WidgetList.AddUnique(Widget);
-		}
-	}
+	
 
 	if (Main)
 	{
+		if (WidgetAsset)
+		{
+
+			Widget = CreateWidget<UUserWidget>(MPC, WidgetAsset);
+			if (Widget)
+			{
+				Widget->AddToViewport();
+				Widget->SetVisibility(ESlateVisibility::Hidden);
+				//WidgetList.AddUnique(Widget);
+			}
+		}
+
 		if (Widget)
 		{
 			if (WidgetTriggerStatus == EWidgetTriggerStatus::WTS_Time)

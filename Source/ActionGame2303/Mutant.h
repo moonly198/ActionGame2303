@@ -50,7 +50,7 @@ public:
 	
 
 	//class AMain* Main;
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	bool bHasValidTarget;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
@@ -143,6 +143,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 		class UAnimMontage* CombatMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+		class UAnimMontage* CriticalCombatMontage;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
+	bool bCriticalAttack = false;
 
 	bool bTakeDamage = false;
 

@@ -26,7 +26,6 @@ UENUM(BlueprintType)
 enum class ECombatStatus : uint8
 {
 	ECS_Normal UMETA(DisplayName = "Normal"),
-	//ECS_Stun UMETA(DisplayName = "Stun"),
 	ECS_Attacking UMETA(DisplayName = "Attacking"),
 	ECS_Targeting UMETA(DisplayName = "Targeting"),
 	ECS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
@@ -475,6 +474,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LockOn")
 		UAnimMontage* CombatMovementMontage;
+
+
+	void SwitchLevel(FName LevelName);
 
 	/*
 	UFUNCTION()

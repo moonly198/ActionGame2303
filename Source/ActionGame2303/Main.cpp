@@ -1042,7 +1042,7 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		if (MovementStatus == EMovementStatus::EMS_Stun)
+		if (MovementStatus == EMovementStatus::EMS_Stun || (Mutant -> bCriticalAttack))
 		{
 			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			LaunchCharacter(EnemyForwardDir * attackedDistance * 3, true, false);  //AttackDistance만큼 앞으로
@@ -1536,6 +1536,21 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 			}
 			
 			
+		}
+	}
+}
+
+void AMain::SwitchLevel(FName LevelName)
+{
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		FString CurrentLevel = World->GetMapName();
+
+		FName CurrentLevelName(*CurrentLevel); //FString FName * ..? FName을 초기화..?
+		if (CurrentLevelName != LevelName)
+		{
+			UGameplayStatics::OpenLevel(World, LevelName);
 		}
 	}
 }
