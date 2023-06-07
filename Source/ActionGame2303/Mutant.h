@@ -7,18 +7,18 @@
 #include "Mutant.generated.h"
 
 UENUM(BlueprintType)
-enum class EEnemyMovementStatus :uint8
+enum class EMutantMovementStatus :uint8
 {
 	
-	EMS_Idle			UMETA(DeplayName = "Idle"),
-	EMS_MoveToTarget	UMETA(DeplayName = "MoveToTarget"),
-	EMS_Attacking		UMETA(DeplayName = "Attacking"),
-	EMS_Beaten		UMETA(DeplayName = "Beaten"),
-	EMS_Stun		UMETA(DeplayName = "Stun"),
-	EMS_CriticalStun		UMETA(DeplayName = "CriticalStun"),
-	EMS_Dead		UMETA(DeplayName = "Dead"),
+	MMS_Idle			UMETA(DeplayName = "Idle"),
+	MMS_MoveToTarget	UMETA(DeplayName = "MoveToTarget"),
+	MMS_Attacking		UMETA(DeplayName = "Attacking"),
+	MMS_Beaten		UMETA(DeplayName = "Beaten"),
+	MMS_Stun		UMETA(DeplayName = "Stun"),
+	MMS_CriticalStun		UMETA(DeplayName = "CriticalStun"),
+	MMS_Dead		UMETA(DeplayName = "Dead"),
 
-	EMS_MAX				UMETA(DeplayName = "DefaultMax")
+	MMS_MAX				UMETA(DeplayName = "DefaultMax")
 
 };
 
@@ -54,10 +54,10 @@ public:
 	bool bHasValidTarget;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
-		EEnemyMovementStatus EnemyMovementStatus;
+		EMutantMovementStatus MutantMovementStatus;
 
-	FORCEINLINE void SetEnemyMovementStatus(EEnemyMovementStatus Status) { EnemyMovementStatus = Status; }
-	FORCEINLINE EEnemyMovementStatus GetEnemyMovementStatus() { return EnemyMovementStatus; }
+	FORCEINLINE void SetMutantMovementStatus(EMutantMovementStatus Status) { MutantMovementStatus = Status; }
+	FORCEINLINE EMutantMovementStatus GetMutantMovementStatus() { return MutantMovementStatus; }
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 		class USphereComponent* AgroSphere;

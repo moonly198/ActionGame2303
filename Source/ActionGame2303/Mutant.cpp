@@ -59,7 +59,7 @@ AMutant::AMutant()
 	AttackMinTime = 0.5f;
 	AttackMaxTime = 3.5f;
 
-	EnemyMovementStatus = EEnemyMovementStatus::EMS_Idle;
+	MutantMovementStatus = EMutantMovementStatus::MMS_Idle;
 
 	StunTime = 5.f;
 	CriticalStunTime = 5.f;
@@ -165,14 +165,10 @@ void AMutant::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Dead) return;
+	if (MutantMovementStatus == EMutantMovementStatus::MMS_Dead) return;
 
 	if (Health <= 0)
 		Die();
-
-
-	
-
 	
 	//스턴이 한번 된 후 스턴이 아니게되면 
 	if (bWasStunned && !bStunned)
@@ -286,7 +282,7 @@ void AMutant::AgroSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 					Main->MainPlayerController->RemoveEnemyHealthBar();
 				}
 
-				SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Idle);
+				SetMutantMovementStatus(EMutantMovementStatus::MMS_Idle);
 				if (AIController)
 				{
 					AIController->StopMovement();
@@ -354,7 +350,7 @@ void AMutant::MoveToTarget(AMain* Target)
 
 		FNavPathSharedPtr NavPath;
 		
-		SetEnemyMovementStatus(EEnemyMovementStatus::EMS_MoveToTarget);
+		SetMutantMovementStatus(EMutantMovementStatus::MMS_MoveToTarget);
 		AIController->MoveTo(MoveRequest, &NavPath); //NavPath의 동일한 주소를 따라가야함
 
 		/* navPath 경로에 구를 설치해서 목적지를 볼수 잇음
@@ -485,7 +481,7 @@ void AMutant::Attack()
 			if (AIController)
 			{
 				AIController->StopMovement();
-				SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Attacking);
+				SetMutantMovementStatus(EMutantMovementStatus::MMS_Attacking);
 			}
 			UE_LOG(LogTemp, Warning, TEXT("enemyAttack!"));
 			bAttacking = true;
@@ -579,7 +575,7 @@ void AMutant::AttackEnd()
 	UE_LOG(LogTemp, Warning, TEXT("Mutant ATtack ENd!"));
 	
 	//CombatSphereOverlapEnd 가 실행이 됬는데 EMS_Attacking 일 경우에는 AttackEnd()에서 한번더 검사
-	if (!bOverlappingCombatSphere && EnemyMovementStatus == EEnemyMovementStatus::EMS_Attacking)
+	if (!bOverlappingCombatSphere && MutantMovementStatus == EMutantMovementStatus::MMS_Attacking)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("nono!"));
 		AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(),0));
@@ -683,7 +679,7 @@ void AMutant::Die()
 		AnimInstance->Montage_JumpToSection(FName("MutantDie"), CombatMontage);
 
 	}
-	SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Dead);
+	SetMutantMovementStatus(EMutantMovementStatus::MMS_Dead);
 
 	LeftCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RightCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -704,7 +700,7 @@ void AMutant::DeathEnd()
 
 bool AMutant::Alive()
 {
-	return GetEnemyMovementStatus() != EEnemyMovementStatus::EMS_Dead;
+	return GetMutantMovementStatus() != EMutantMovementStatus::MMS_Dead;
 }
 
 void AMutant::Disappear()
@@ -716,7 +712,7 @@ void AMutant::Disappear()
 void AMutant::Stunned()
 {
 	UE_LOG(LogTemp, Warning, TEXT("MutantStun!"));
-	EnemyMovementStatus = EEnemyMovementStatus::EMS_Stun;
+	MutantMovementStatus = EMutantMovementStatus::MMS_Stun;
 	AttackEnd();
 	//bAttacking = false;
 
@@ -758,7 +754,7 @@ void AMutant::CriticalStunned()
 	UE_LOG(LogTemp, Warning, TEXT("MutantCriticalStun!"));
 	//CombatTarget = nullptr;
 	AttackEnd();
-	EnemyMovementStatus = EEnemyMovementStatus::EMS_CriticalStun;
+	MutantMovementStatus = EMutantMovementStatus::MMS_CriticalStun;
 
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	class UEnemyAnimInstance* EnemyAnimInstance;
@@ -810,7 +806,7 @@ void AMutant::Rigid()
 	if (AnimInstance && StunMontage)
 	{
 		//스턴상태일때만 경직 먹기
-		if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Stun)
+		if (MutantMovementStatus == EMutantMovementStatus::MMS_Stun)
 		{
 			AnimInstance->Montage_Play(StunMontage, 1.f);
 			AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);

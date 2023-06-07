@@ -844,7 +844,7 @@ void AMain::AttackCritical()
 		MovementStatus != EMovementStatus::EMS_Stun &&
 		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 		CombatTarget !=nullptr&&
-		(Mutant->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun ||
+		(Mutant->MutantMovementStatus == EMutantMovementStatus::MMS_CriticalStun ||
 			Dummy->DummyMovementStatus == EDummyMovementStatus::DMS_CriticalStun)&&
 		Stamina > 0.f &&
 		!bCriticalAttack&&
@@ -1501,7 +1501,7 @@ void AMain::TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 			SetCombatTarget(Enemy);
 
 			// 현재 잡히는 뮤턴트의 개수 출력
-			UE_LOG(LogTemp, Warning, TEXT("current Mutant: %d"), lockOnCandidates.Num());
+			UE_LOG(LogTemp, Warning, TEXT("current Enemy: %d"), lockOnCandidates.Num());
 
 		}
 	}
