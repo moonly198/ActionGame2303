@@ -270,11 +270,11 @@ void AMutant::AgroSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 				
 
 				// 적 체력바
-				if (Main->CombatTarget == this && !Main->bTargetingBoxOverlap)
+				//if (Main->CombatTarget == this && !Main->bTargetingBoxOverlap)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("combattarget xxxxxxx!!!!!!!!!!!"));
-					Main->SetCombatTarget(nullptr);
-					Main->SetHasCombatTarget(false);
+				//	UE_LOG(LogTemp, Warning, TEXT("combattarget xxxxxxx!!!!!!!!!!!"));
+				//	Main->SetCombatTarget(nullptr);
+				//	Main->SetHasCombatTarget(false);
 				}
 
 				if (Main->MainPlayerController)

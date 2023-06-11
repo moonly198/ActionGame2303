@@ -128,6 +128,7 @@ void AMainPlayerController::DisplayEnemyHealthBar()
 {
 	if (EnemyHealthBar)
 	{
+		UE_LOG(LogTemp, Warning, TEXT(" DisplayEnemyHealthBar222222"));
 		bEnemyHealthBarVisible = true;
 		EnemyHealthBar->SetVisibility(ESlateVisibility::Visible);
 	}

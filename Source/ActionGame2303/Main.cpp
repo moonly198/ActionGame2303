@@ -26,6 +26,7 @@
 #include "TimerManager.h"
 #include "HealthDamageType.h"
 #include "Engine/EngineTypes.h"
+#include "Enemy.h"
 #include "Dummy.h"
 
 // Sets default values
@@ -138,6 +139,7 @@ AMain::AMain()
 	//bTargetingCameraBoxOverlap = false;
 
 	bCriticalAttack = false;
+	
 }
 
 
@@ -146,16 +148,8 @@ void AMain::BeginPlay()
 {
 	Super::BeginPlay();
 
+	
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
-
-	AActor* FoundActor1 = UGameplayStatics::GetActorOfClass(GetWorld(), AMutant::StaticClass());
-	Mutant = Cast<AMutant>(FoundActor1);
-	
-	
-	AActor* FoundActor2 = UGameplayStatics::GetActorOfClass(GetWorld(), ADummy::StaticClass());
-	Dummy = Cast<ADummy>(FoundActor2);
-	
-	
 
 	SwordCombatCollision->OnComponentBeginOverlap.AddDynamic(this, &AMain::CombatOnOverlapBegin);
 	SwordCombatCollision->OnComponentEndOverlap.AddDynamic(this, &AMain::CombatOnOverlapEnd);
@@ -179,12 +173,6 @@ void AMain::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	if (MovementStatus == EMovementStatus::EMS_Dead) return;
-
-	//임시
-	if (CombatTarget == Mutant)
-		a = 0;
-	else if(CombatTarget == Dummy)
-		a = 1;
 
 	//EMovementStatus::EMS_Stun 이고 스턴상태일때, bStunned으로로 안한 이유는 스턴애님이 바로 해제 됨 
 	//달려서 지칠때 애님이 너무 길어서 종료하게끔 만듬, 스턴시 숨소리
@@ -354,7 +342,7 @@ void AMain::Tick(float DeltaTime)
 		FRotator TargetRotation;
 
 		//if (CombatTarget->bCriticalStunned)
-		if (Mutant && Mutant->bCriticalStunned)
+		if (CombatTarget && CombatTarget->bCriticalStunned)
 			TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), CombatTarget->GetMesh()->GetSocketLocation(FName("TargetSocket")));
 		else
 			TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), CombatTarget->GetActorLocation());
@@ -844,8 +832,7 @@ void AMain::AttackCritical()
 		MovementStatus != EMovementStatus::EMS_Stun &&
 		CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 		CombatTarget !=nullptr&&
-		(Mutant->MutantMovementStatus == EMutantMovementStatus::MMS_CriticalStun ||
-			Dummy->DummyMovementStatus == EDummyMovementStatus::DMS_CriticalStun)&&
+		(CombatTarget->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun)&&
 		Stamina > 0.f &&
 		!bCriticalAttack&&
 		!bCriticalAttackOnce)
@@ -1042,7 +1029,7 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		if (MovementStatus == EMovementStatus::EMS_Stun || (Mutant -> bCriticalAttack))
+		if (MovementStatus == EMovementStatus::EMS_Stun || (CombatTarget -> bCriticalAttack))
 		{
 			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			LaunchCharacter(EnemyForwardDir * attackedDistance * 3, true, false);  //AttackDistance만큼 앞으로
@@ -1076,21 +1063,15 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 		Die();
 		if (DamageCauser)
 		{
-			AMutant* Enemy = Cast <AMutant>(DamageCauser);
-			if (Enemy)
+			CombatTarget = Cast <AEnemy>(DamageCauser);
+			if (CombatTarget)
 			{
-				Enemy->bHasValidTarget = false;
+				CombatTarget->bHasValidTarget = false;
 			}
 		}
 	}
 	else
 	{
-		/*
-		if(MovementStatus == EMovementStatus::
-		_Stun)
-			Health -= CombatTarget->D;
-		else
-		*/
 		Health -= DamageAmount;
 	}
 
@@ -1383,8 +1364,7 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 {
 	if (OtherActor)
 	{
-		//AMutant* Enemy = Cast<AMutant>(OtherActor);
-		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
+		AEnemy* Enemy = Cast<AEnemy>(OtherActor);
 		if (Enemy)
 		{
 			FHitResult EnemyHitResult = SweepResult;
@@ -1398,32 +1378,14 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 				//actor(MyProject의Weapon.cpp)는 Skeletalmesh를 받고 char는 GetMesh()
 				FVector SocketLocation = WeaponSocket->GetSocketLocation(GetMesh());
 
-
-				if (CombatTarget == Mutant)
+			
+				if (Enemy->HitParticles)
 				{
-					if (Mutant->HitParticles)
-					{
-						UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Mutant->HitParticles, SocketLocation, FRotator(0.f), false);
-
-					}
-
-					if (Mutant->HitSound)
-					{
-						UGameplayStatics::PlaySound2D(this, Mutant->HitSound);
-					}
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Enemy->HitParticles, SocketLocation, FRotator(0.f), false);
 				}
-				else if (CombatTarget == Dummy)
+				if (Enemy->HitSound)
 				{
-					if (Dummy->HitParticles)
-					{
-						UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), Dummy->HitParticles, SocketLocation, FRotator(0.f), false);
-						
-					}
-					if (Dummy->HitSound)
-					{
-						UGameplayStatics::PlaySound2D(this, Dummy->HitSound);
-					}
-
+					UGameplayStatics::PlaySound2D(this, Enemy->HitSound);
 				}
 			}
 			
@@ -1491,7 +1453,7 @@ void AMain::TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 	if (OtherActor)
 	{
 		//AMutant* Enemy = Cast<AMutant>(OtherActor);
-		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
+		AEnemy* Enemy = Cast<AEnemy>(OtherActor);
 		if (Enemy)
 		{
 			bTargetingBoxOverlap = true;
@@ -1513,12 +1475,13 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 	if (OtherActor)
 	{
 		//AMutant* Enemy = Cast<AMutant>(OtherActor);
-		ACharacter* Enemy = Cast<ACharacter>(OtherActor);
+		AEnemy* Enemy = Cast<AEnemy>(OtherActor);
 		if (Enemy)
 		{
 			bTargetingBoxOverlap = false;
 			lockOnCandidates.Remove(Enemy);
 
+			/*
 			if (!Mutant->bAgroShpehreOverlap)//뮤턴트의 어그로 스피어 밖일때
 			{
 				//락온을 강제해제 시킴
@@ -1533,7 +1496,7 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 				}
 				bLockOn = false;
 
-			}
+			}*/
 			
 			
 		}

@@ -229,10 +229,10 @@ void ADummy::AgroSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AA
 			{
 
 				// 적 체력바
-				if (Main->CombatTarget == this && !Main->bTargetingBoxOverlap)
+				//if (Main->CombatTarget == this && !Main->bTargetingBoxOverlap)
 				{
-					Main->SetCombatTarget(nullptr);
-					Main->SetHasCombatTarget(false);
+				//	Main->SetCombatTarget(nullptr);
+				//	Main->SetHasCombatTarget(false);
 				}
 
 				if (Main->MainPlayerController)

@@ -48,6 +48,8 @@ public:
 
 
 	//class AMain* Main;
+	
+	//main이 죽을시 에너미의 타겟이 존재하지 않기때문에 생성
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 		bool bHasValidTarget;
 
@@ -199,11 +201,11 @@ public:
 	UFUNCTION()
 		virtual void CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	UFUNCTION(BlueprintCallable)
-		virtual void ActivateCollision();
+	//UFUNCTION(BlueprintCallable)
+	//	void ActivateCollision();
 
-	UFUNCTION(BlueprintCallable)
-		virtual void DeactivateCollision();
+	//UFUNCTION(BlueprintCallable)
+	//	void DeactivateCollision();
 
 
 	UFUNCTION(BlueprintCallable)

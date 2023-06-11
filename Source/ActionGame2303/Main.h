@@ -137,21 +137,13 @@ public:
 	*/
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-		class ACharacter* CombatTarget;
+		class AEnemy* CombatTarget;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		TArray<ACharacter*> CombatTargetList;
+		TArray<AEnemy*> CombatTargetList;
 	
-	FORCEINLINE void SetCombatTarget(ACharacter* Target) { CombatTarget = Target; }
+	FORCEINLINE void SetCombatTarget(AEnemy* Target) { CombatTarget = Target; }
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-		class AMutant* Mutant;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
-		class ADummy* Dummy;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat") // ¿”Ω√
-		int a;
 
 	
 
@@ -445,10 +437,10 @@ public:
 		float stopAngle; // ≈∏∞‘∆√ µÃ¿ª∂ß ƒ´∏ﬁ∂Û ∏ÿ√„ ∞¢µµ
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		ACharacter* lockedOnActor;
+		AEnemy* lockedOnActor;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LockOn")
-		TArray<ACharacter*> lockOnCandidates;
+		TArray<AEnemy*> lockOnCandidates;
 
 	class APlayerCameraManager* CameraManager;
 

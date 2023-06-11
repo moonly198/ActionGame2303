@@ -55,10 +55,11 @@ public:
 
 	void CriticalStunned()override;
 
-	
-	void ActivateCollision()override;
-	
-	void DeactivateCollision()override;
+	UFUNCTION(BlueprintCallable)
+	void ActivateCollision();
+
+	UFUNCTION(BlueprintCallable)
+	void DeactivateCollision();
 
 
 	void Die()override;

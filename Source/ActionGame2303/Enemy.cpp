@@ -74,6 +74,7 @@ void AEnemy::BeginPlay()
 	if (Main)
 	{
 		Main->TargetingBoxCollision->IgnoreActorWhenMoving(Main, true);
+		Main->CombatTarget = this;
 		MoveToTarget(Main);
 	}
 
@@ -164,13 +165,14 @@ void AEnemy::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedComponent
 			{
 				bOverlappingCombatSphere = true;
 				CombatTarget = Main;
+				bHasValidTarget = true;
 
 				FVector MainLocation = Main->GetActorLocation();
 				FVector MutantLocation = this->GetActorLocation();
 				float DistanceToMain = FVector::Distance(MainLocation, MutantLocation);
 				UE_LOG(LogTemp, Warning, TEXT("Parent Class"));
 
-				Attack();
+				//Attack();
 			}
 		}
 	}
@@ -188,7 +190,7 @@ void AEnemy::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, 
 				if (!bStunned && !bCriticalStunned && !bAttacking)
 				{
 					CombatTarget = nullptr;
-					MoveToTarget(Main);
+					//MoveToTarget(Main);
 				}
 				//오버랩 끝날시 공격 타이머 리셋
 				GetWorldTimerManager().ClearTimer(AttackTimer);
@@ -262,12 +264,12 @@ void AEnemy::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AAct
 
 void AEnemy::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
+
 }
 
-
+/*
 void AEnemy::ActivateCollision()
 {
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 
 }
 
@@ -275,10 +277,9 @@ void AEnemy::DeactivateCollision()
 {
 	
 }
-
+*/
 void AEnemy::Attack()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Enemy Attack0000000000"));
 	if (Alive() && bHasValidTarget && !bStunned && !bCriticalStunned)
 	{
 
@@ -289,7 +290,8 @@ void AEnemy::Attack()
 				AIController->StopMovement();
 				SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Attacking);
 			}
-		
+			UE_LOG(LogTemp, Warning, TEXT("Enemy Attack0000000000"));
+
 			bAttacking = true;
 			SetInterpToEnemy(true);
 
@@ -309,7 +311,7 @@ void AEnemy::AttackEnd()
 		AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 		MoveToTarget(Main);
 	}
-	/*
+	
 	if (bOverlappingCombatSphere)
 	{
 		//AttackTime은 AttackMinTime과 AttackMaxTime 사이의 랜덤 숫자
@@ -317,7 +319,7 @@ void AEnemy::AttackEnd()
 		//AttackTime 후 에 Attack()함수 호출
 		GetWorldTimerManager().SetTimer(AttackTimer, this, &AEnemy::Attack, AttackTime);
 	}
-	*/
+	
 }
 
 float AEnemy::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
@@ -390,6 +392,12 @@ float AEnemy::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEv
 void AEnemy::Die()
 {
 	SetEnemyMovementStatus(EEnemyMovementStatus::EMS_Dead);
+
+	AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+	if (Main->MainPlayerController)
+	{
+		Main->MainPlayerController->RemoveEnemyHealthBar();
+	}
 
 	CombatSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
