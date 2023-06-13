@@ -17,6 +17,7 @@
 #include "MainPlayerController.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "EnemyAnimInstance.h"
+#include "Components/AudioComponent.h"
 
 // Sets default values
 AEnemy::AEnemy()
@@ -27,6 +28,9 @@ AEnemy::AEnemy()
 	CombatSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CombatSphere"));
 	CombatSphere->SetupAttachment(GetRootComponent());
 	CombatSphere->InitSphereRadius(75.f);
+
+	StunAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("StunAudio"));
+	StunAudioComponent->SetupAttachment(GetRootComponent());
 
 	bOverlappingCombatSphere = false;
 
@@ -90,10 +94,12 @@ void AEnemy::Tick(float DeltaTime)
 
 	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Dead) return;
 
+	if (CombatTarget && CombatTarget->MovementStatus == EMovementStatus::EMS_Dead) return;
+
 	if (Health <= 0)
 		Die();
 
-	//스턴이 한번 된 후 스턴이 아니게되면 
+	//스턴이 한번 된 후 스턴이 아니게되면 (스태미나를 회복하면)
 	if (bWasStunned && !bStunned)
 	{
 		if (bCriticalStunned)
@@ -119,8 +125,6 @@ void AEnemy::Tick(float DeltaTime)
 			Stamina += DeltaStamina;
 		}
 		Stamina = (MaxStamina - CurrentMaxStamina);
-
-
 
 		bWasStunned = false; // bStunned = false임 bWasStunne은 스턴 함수에서 트루로 변경해줌
 	}
@@ -190,7 +194,7 @@ void AEnemy::CombatSphereOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, 
 				if (!bStunned && !bCriticalStunned && !bAttacking)
 				{
 					CombatTarget = nullptr;
-					//MoveToTarget(Main);
+					MoveToTarget(Main);
 				}
 				//오버랩 끝날시 공격 타이머 리셋
 				GetWorldTimerManager().ClearTimer(AttackTimer);
@@ -267,17 +271,6 @@ void AEnemy::CombatOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor
 
 }
 
-/*
-void AEnemy::ActivateCollision()
-{
-
-}
-
-void AEnemy::DeactivateCollision()
-{
-	
-}
-*/
 void AEnemy::Attack()
 {
 	if (Alive() && bHasValidTarget && !bStunned && !bCriticalStunned)
@@ -429,27 +422,36 @@ void AEnemy::Stunned()
 	EnemyMovementStatus = EEnemyMovementStatus::EMS_Stun;
 	AttackEnd();
 
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	class UEnemyAnimInstance* EnemyAnimInstance;
-	EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
+	//UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	//class UEnemyAnimInstance* EnemyAnimInstance;
+	//EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
 
-	if (EnemyAnimInstance != nullptr)
-	{
-		UGameplayStatics::PlaySound2D(this, StunSound);
+	//if (EnemyAnimInstance != nullptr)
+	//{
+		if (StunSound)
+		{
+			if (StunAudioComponent->Sound != StunSound)
+				StunAudioComponent->SetSound(StunSound);
+
+			if (!StunAudioComponent->IsPlaying())
+				StunAudioComponent->Play();
+
+		}
 		bStunned = true;
 
-		if (AnimInstance && StunMontage)
-		{
+		//if (AnimInstance && StunMontage)
+		//{
 
-			GetWorld()->GetTimerManager().SetTimer(StunTimer, FTimerDelegate::CreateLambda([&]()
-				{
-					bStunned = false;
-					//Main 캐스팅을 람다함수 전에 만들면 오류가 남
-					//AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
-					//MoveToTarget(Main);
-				}), StunTime, false);
-		}
-	}
+		GetWorld()->GetTimerManager().SetTimer(StunTimer, FTimerDelegate::CreateLambda([&]()
+			{
+				bStunned = false;
+					
+				//Main 캐스팅을 람다함수 전에 만들면 오류가 남
+				//AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+				//MoveToTarget(Main);	
+			}), StunTime, false);
+		//}
+	//}
 	bWasStunned = true;
 }
 
@@ -465,22 +467,46 @@ void AEnemy::CriticalStunned()
 	AttackEnd();
 	EnemyMovementStatus = EEnemyMovementStatus::EMS_CriticalStun;
 
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	class UEnemyAnimInstance* EnemyAnimInstance;
-	EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
+	//UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	//class UEnemyAnimInstance* EnemyAnimInstance;
+	//EnemyAnimInstance = Cast<UEnemyAnimInstance>(GetMesh()->GetAnimInstance());
 
-	if (EnemyAnimInstance != nullptr)
+	//if (EnemyAnimInstance != nullptr)
 	{
-		UGameplayStatics::PlaySound2D(this, CriticalStunSound);
-		bCriticalStunned = true;
+		if (StunSound)
+		{
+			if (StunAudioComponent->Sound != StunSound)
+				StunAudioComponent->SetSound(StunSound);
 
+			if (!StunAudioComponent->IsPlaying())
+				StunAudioComponent->Play();
+
+		}
+		bCriticalStunned = true;
 		GetWorld()->GetTimerManager().SetTimer(StunTimer, FTimerDelegate::CreateLambda([&]()
 			{
 				//bCriticalStunned = false; // anim_bp 에서 해줌
 				bCriticalStunnedAnimPlay = false;
 				CurrentMaxStamina = 0.f;
 				Stamina = MaxStamina;
-			
+				
 			}), CriticalStunTime, false);
 	}
+}
+
+//스턴때 맞으면 경직
+void AEnemy::Rigid()
+{
+	//스턴상태일때만 경직 먹기
+	if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Stun)
+	{
+		AMain* Main = Cast<AMain>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+		const FVector MainForwordDir = Main->GetActorRotation().Vector(); // 메인캐릭터가 가고있는 앞쪽방향
+		LaunchCharacter((MainForwordDir * AttackedDistance) / 2, true, false);
+	}
+}
+
+void AEnemy::PlaySound()
+{
+	
 }

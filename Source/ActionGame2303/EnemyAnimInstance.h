@@ -35,4 +35,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement)
 		class AEnemy* Enemy;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement)
+		class AEnemy_Sevarog* Enemy_Sevarog;
 };

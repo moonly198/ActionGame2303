@@ -27,7 +27,9 @@
 #include "HealthDamageType.h"
 #include "Engine/EngineTypes.h"
 #include "Enemy.h"
+#include "Mutant_test.h"
 #include "Dummy.h"
+
 
 // Sets default values
 AMain::AMain()
@@ -70,7 +72,7 @@ AMain::AMain()
 	GetCapsuleComponent()->SetCapsuleSize(48.f, 105.f);
 
 	SwordCombatCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("SwordCombatCollision"));
-	SwordCombatCollision->SetupAttachment(GetMesh(), FName("Sword_Strike"));
+	SwordCombatCollision->SetupAttachment(GetMesh(), FName("WeaponSocket"));
 
 
 	//Don't rotate when the controller rotates.
@@ -148,6 +150,12 @@ void AMain::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//CombatTarget이 하나만 있다는 전제
+	if (CombatTarget)
+	{
+		SetHasCombatTarget(true);
+		SetCombatTarget(CombatTarget);
+	}
 	
 	MainPlayerController = Cast<AMainPlayerController>(GetController());
 
@@ -598,7 +606,7 @@ void AMain::Dashing()
 
 				if (AnimInstance && DashMontage)
 				{
-					AnimInstance->Montage_Play(DashMontage, 1);
+					AnimInstance->Montage_Play(DashMontage, 1.5);
 
 				}
 			}
@@ -826,6 +834,10 @@ void AMain::RMBUp()
 
 void AMain::AttackCritical()
 {
+	float EnemyLocation = CombatTarget->GetActorLocation().Size();
+	float MainLocation = this->GetActorLocation().Size();
+	float MainToEnemy = EnemyLocation - MainLocation;
+
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (!bAttacking &&
 		MovementStatus != EMovementStatus::EMS_Dead &&
@@ -835,7 +847,8 @@ void AMain::AttackCritical()
 		(CombatTarget->EnemyMovementStatus == EEnemyMovementStatus::EMS_CriticalStun)&&
 		Stamina > 0.f &&
 		!bCriticalAttack&&
-		!bCriticalAttackOnce)
+		!bCriticalAttackOnce &&
+		MainToEnemy<50.f)
 	{
 		bCriticalAttack = true;
 		bCriticalAttackOnce = true;
@@ -845,8 +858,11 @@ void AMain::AttackCritical()
 		UE_LOG(LogTemp, Warning, TEXT("Critical Attack!!"));
 		if (AnimInstance && CombatMontage)
 		{
+			//const FVector UpDir = this->GetActorRotation().Vector(); // 대쉬 방향 캐릭터가 보고잇는 방향
+			//LaunchCharacter(UpDir * criticalDistance, false, true);
+
 			AnimInstance->Montage_Play(CombatMontage, 1.f);
-			AnimInstance->Montage_JumpToSection(FName("CriticalAttack2"), CombatMontage);
+			AnimInstance->Montage_JumpToSection(FName("CriticalAttack"), CombatMontage);
 		}
 
 	}
@@ -870,8 +886,8 @@ void AMain::Attack()
 		Stamina -= AttackStamina; //공격시 스태미너 AttackStamina만큼 - 하기
 		bAttacking = true;
 
-		if(!bLockOn)
-			SetInterpToEnemy(true);
+		//if(!bLockOn)
+		//	SetInterpToEnemy(true);
 
 		
 		UE_LOG(LogTemp, Warning, TEXT("CurrentComnoCount : %d"), CurrentComboCount);
@@ -907,6 +923,14 @@ void AMain::Attack()
 				AnimInstance->Montage_JumpToSection(FName("Attack_3"), CombatMontage);
 				LaunchCharacter(ForwardDir * AttackDistance, true, false);
 				
+			}
+			else if (CurrentComboCount == 3)
+			{
+
+				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_JumpToSection(FName("Attack_4"), CombatMontage);
+				LaunchCharacter(ForwardDir * AttackDistance, true, false);
+
 				bLastAttack = true;
 			}
 		}
@@ -953,13 +977,6 @@ void AMain::AttackEnd()
 	bFirstClick = true;
 	bLastAttack = false;
 	CurrentComboCount = 0;
-
-	
-	//if (bLMBDown)
-	//{
-	//	Attack();
-	//}
-	
 }
 
 void AMain::StaminaDelay(float Time)
@@ -1029,7 +1046,7 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 	if (AnimInstance && CombatMontage)
 	{
 		const FVector EnemyForwardDir = CombatTarget->GetActorRotation().Vector(); // 에너미가 가고있는 앞쪽방향
-		if (MovementStatus == EMovementStatus::EMS_Stun || (CombatTarget -> bCriticalAttack))
+		if (MovementStatus == EMovementStatus::EMS_Stun)
 		{
 			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			LaunchCharacter(EnemyForwardDir * attackedDistance * 3, true, false);  //AttackDistance만큼 앞으로
@@ -1372,7 +1389,7 @@ void AMain::CombatOnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActo
 			{
 				DeactivateCollision();
 			}
-			const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("Sword_Blood");
+			const USkeletalMeshSocket* WeaponSocket = GetMesh()->GetSocketByName("WeaponSocket");
 			if (WeaponSocket)
 			{
 				//actor(MyProject의Weapon.cpp)는 Skeletalmesh를 받고 char는 GetMesh()
@@ -1415,7 +1432,8 @@ void AMain::DeactivateCollision()
 
 void AMain::ToggleLockOn()
 {
-	
+
+	UE_LOG(LogTemp, Warning, TEXT("Click Wheel"));
 	if (MainPlayerController)
 	{
 		
@@ -1424,13 +1442,14 @@ void AMain::ToggleLockOn()
 			MainPlayerController->ToggleTargetingCrossHair();
 			if (bLockOn)
 			{
+				UE_LOG(LogTemp, Warning, TEXT(" not lockon"));
 				SetCombatStatus(ECombatStatus::ECS_Normal);
 				bLockOn = false;
 				lockedOnActor = nullptr;
 			}
 			else
 			{
-
+				UE_LOG(LogTemp, Warning, TEXT("lockon"));
 				SetCombatStatus(ECombatStatus::ECS_Targeting);
 
 				if (lockOnCandidates.Num() > 0)
@@ -1454,16 +1473,14 @@ void AMain::TargetingBoxOnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
 	{
 		//AMutant* Enemy = Cast<AMutant>(OtherActor);
 		AEnemy* Enemy = Cast<AEnemy>(OtherActor);
-		if (Enemy)
+		AMutant_test* Mutant_test = Cast<AMutant_test>(OtherActor);
+		ADummy* Dummy = Cast<ADummy>(OtherActor);
+		if (Enemy||Mutant_test || Dummy)
 		{
 			bTargetingBoxOverlap = true;
 			lockOnCandidates.AddUnique(Enemy);
-
-			SetHasCombatTarget(true);
-			SetCombatTarget(Enemy);
-
-			// 현재 잡히는 뮤턴트의 개수 출력
-			UE_LOG(LogTemp, Warning, TEXT("current Enemy: %d"), lockOnCandidates.Num());
+			lockOnCandidates.AddUnique(Mutant_test);
+			lockOnCandidates.AddUnique(Dummy);
 
 		}
 	}
@@ -1476,28 +1493,14 @@ void AMain::TargetingBoxOnOverlapEnd(UPrimitiveComponent* OverlappedComponent, A
 	{
 		//AMutant* Enemy = Cast<AMutant>(OtherActor);
 		AEnemy* Enemy = Cast<AEnemy>(OtherActor);
-		if (Enemy)
+		AMutant_test* Mutant_test = Cast<AMutant_test>(OtherActor);
+		ADummy* Dummy = Cast<ADummy>(OtherActor);
+		if (Enemy || Mutant_test || Dummy)
 		{
 			bTargetingBoxOverlap = false;
 			lockOnCandidates.Remove(Enemy);
-
-			/*
-			if (!Mutant->bAgroShpehreOverlap)//뮤턴트의 어그로 스피어 밖일때
-			{
-				//락온을 강제해제 시킴
-				SetHasCombatTarget(false);
-				SetCombatTarget(nullptr);
-
-				Mutant->CombatTarget = nullptr;
-
-				if (MainPlayerController)
-				{
-					MainPlayerController->RemoveTargetingCrossHair();
-				}
-				bLockOn = false;
-
-			}*/
-			
+			lockOnCandidates.Remove(Mutant_test);
+			lockOnCandidates.Remove(Dummy);
 			
 		}
 	}

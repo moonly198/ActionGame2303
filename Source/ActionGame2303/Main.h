@@ -13,9 +13,6 @@ enum class EMovementStatus : uint8
 	EMS_Sprinting UMETA(DisplayName = "Sprinting"),
 	EMS_Walking UMETA(DisplayName = "Walking"),
 	EMS_Stun UMETA(DisplayName = "Stun"),
-	//EMS_Attacking UMETA(DisplayName = "Attacking"),
-	//EMS_StunTakeDamage UMETA(DisplayName = "StunTakeDamage"),
-	//EMS_TakeDamage UMETA(DisplayName = "TakeDamage"),
 	EMS_Dead UMETA(DisplayName = "Dead"),
 
 
@@ -102,6 +99,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* DashSound;
+
+
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 	//	USoundCue* StunSound;
@@ -292,6 +291,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player Stats")
 		UAnimMontage* DashMontage;
 
+	UPROPERTY(EditAnywhere)
+		float DashSpeed =1.f;
+
 
 
 	UPROPERTY(VisibleAnywhere, Category = "Combat")
@@ -362,6 +364,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat")
 	bool bCriticalAttackOnce = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+		float criticalDistance = 5000;
 
 	UFUNCTION(BlueprintCallable)
 		void AttackEnd();

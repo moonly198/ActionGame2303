@@ -81,6 +81,7 @@ void AMutant_test::CombatSphereOnOverlapBegin(UPrimitiveComponent* OverlappedCom
 			{
 				Main->MainPlayerController->DisplayEnemyHealthBar();
 				Attack();
+				
 			}
 		}
 	}
@@ -112,60 +113,64 @@ void AMutant_test::Attack()
 	float DistanceToMain = FVector::Distance(MainLocation, MutantLocation);
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 
-	if (AnimInstance)
+	if (Alive() && bHasValidTarget && !bStunned && !bCriticalStunned)
 	{
-
-		int32 Section = FMath::RandRange(0, 3);
-		switch (Section)
+		if (AnimInstance)
 		{
-		case 0:
-			UE_LOG(LogTemp, Warning, TEXT("Attack0"));
-			//if (DistanceToMain <= 100)
-			{
-				SetInterpToEnemy(false);
-				AnimInstance->Montage_Play(CombatMontage, 1.f);
-				AnimInstance->Montage_JumpToSection(FName("MutantAttack_Punch"), CombatMontage);
-			}
+
+				int32 Section = FMath::RandRange(0, 3);
+				switch (Section)
+				{
+				case 0:
+					UE_LOG(LogTemp, Warning, TEXT("Attack0"));
+					//if (DistanceToMain <= 100)
+					{
+						SetInterpToEnemy(false);
+						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Punch"), CombatMontage);
+					}
 
 
-			break;
+					break;
 
-		case 1:
-			UE_LOG(LogTemp, Warning, TEXT("Attack1"));
-			//if (DistanceToMain <= 100)
-			{
-				SetInterpToEnemy(false);
-				AnimInstance->Montage_Play(CombatMontage, 1.f);
-				AnimInstance->Montage_JumpToSection(FName("MutantAttack_Swiping"), CombatMontage);
-			}
+				case 1:
+					UE_LOG(LogTemp, Warning, TEXT("Attack1"));
+					//if (DistanceToMain <= 100)
+					{
+						SetInterpToEnemy(false);
+						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Swiping"), CombatMontage);
+					}
 
 
 
-			break;
-		case 2:
-			UE_LOG(LogTemp, Warning, TEXT("Attack2"));
-			//if (DistanceToMain <= 100)
-			{
-				SetInterpToEnemy(false);
-				AnimInstance->Montage_Play(CombatMontage, 1.f);
-				AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
-			}
+					break;
+				case 2:
+					UE_LOG(LogTemp, Warning, TEXT("Attack2"));
+					//if (DistanceToMain <= 100)
+					{
+						SetInterpToEnemy(false);
+						AnimInstance->Montage_Play(CombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_Jumping"), CombatMontage);
+					}
 
-			break;
+					break;
 
-		case 3:
-			UE_LOG(LogTemp, Warning, TEXT("Attack3"));
-			if (DistanceToMain >= 500) 
-			{
-				bCriticalAttack = true;
-				AnimInstance->Montage_Play(CriticalCombatMontage, 1.f);
-				AnimInstance->Montage_JumpToSection(FName("MutantAttack_JumpAttack"), CriticalCombatMontage);
-			}
-			AttackEnd(); //임시
-			break;
+				case 3:
+					UE_LOG(LogTemp, Warning, TEXT("Attack3"));
+					if (DistanceToMain >= 500)
+					{
+						bCriticalAttack = true;
+						AnimInstance->Montage_Play(CriticalCombatMontage, 1.f);
+						AnimInstance->Montage_JumpToSection(FName("MutantAttack_JumpAttack"), CriticalCombatMontage);
+					}
+					AttackEnd(); //임시
+					break;
 
-		default:
-			;
+				default:
+					;
+				}
+			
 		}
 	}
 }
@@ -274,3 +279,20 @@ void AMutant_test::Die()
 	FootCombatCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 }
+
+void AMutant_test::Rigid()
+{
+	AEnemy::Rigid();
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && StunMontage)
+	{
+		//스턴상태일때만 경직 먹기
+		if (EnemyMovementStatus == EEnemyMovementStatus::EMS_Stun)
+		{
+			AnimInstance->Montage_Play(StunMontage, 1.f);
+			AnimInstance->Montage_JumpToSection(FName("Mutant_HitReact"), CombatMontage);
+		}
+	}
+}
+

@@ -126,7 +126,11 @@ public:
 	virtual void Stunned();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
-		USoundCue* StunSound;
+		class USoundBase* StunSound;
+
+	//AudioComponent를 쓰려면 CreateDefaultSubobject로 붙여줘야함
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Stun")
+		class UAudioComponent* StunAudioComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float StunTime;
@@ -138,9 +142,6 @@ public:
 
 	//CriticalStun
 	virtual void CriticalStunned();
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
-		USoundCue* CriticalStunSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float CriticalStunTime;
@@ -229,5 +230,10 @@ public:
 	virtual void Die();
 
 	void Disappear();
+
+	virtual void Rigid();
+
+	UFUNCTION(BlueprintCallable)
+	virtual void PlaySound();
 
 };

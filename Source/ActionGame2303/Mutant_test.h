@@ -64,4 +64,6 @@ public:
 
 	void Die()override;
 
+	void Rigid()override;
+
 };

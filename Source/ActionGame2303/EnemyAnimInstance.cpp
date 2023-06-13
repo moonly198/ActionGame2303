@@ -5,6 +5,7 @@
 #include "Mutant.h"
 #include "Enemy.h"
 #include "Mutant_test.h"
+#include "Enemy_Sevarog.h"
 
 void UEnemyAnimInstance::NativeInitializeAnimation()
 {
@@ -13,19 +14,12 @@ void UEnemyAnimInstance::NativeInitializeAnimation()
 		Pawn = TryGetPawnOwner(); // 현재클래스의 pawn을 얻기
 		if (Pawn)
 		{
-			//if (Enemy)
-			{
-				Enemy = Cast<AEnemy>(Pawn);
-			}
-			//else if (Mutant)
-			{
-				Mutant = Cast<AMutant>(Pawn);
-			}
-			//else if (Mutant_test)
-			{
-				Mutant_test = Cast<AMutant_test>(Pawn);
-			}
 			
+			Enemy = Cast<AEnemy>(Pawn);
+			Mutant = Cast<AMutant>(Pawn);
+			Mutant_test = Cast<AMutant_test>(Pawn);
+			Enemy_Sevarog = Cast<AEnemy_Sevarog>(Pawn);
+
 		}
 	}
 }
@@ -37,19 +31,10 @@ void UEnemyAnimInstance::UpdateAnimationProperties()
 		Pawn = TryGetPawnOwner();
 		if (Pawn)
 		{
-			//if (Enemy)
-			{
-				Enemy = Cast<AEnemy>(Pawn);
-			}
-			//else if ( Mutant)
-			{
-				Mutant = Cast<AMutant>(Pawn);
-			}
-			//else if (Mutant_test)
-			{
-				Mutant_test = Cast<AMutant_test>(Pawn);
-			}
-			
+			Enemy = Cast<AEnemy>(Pawn);
+			Mutant = Cast<AMutant>(Pawn);
+			Mutant_test = Cast<AMutant_test>(Pawn);
+			Enemy_Sevarog = Cast<AEnemy_Sevarog>(Pawn);
 		}
 	}
 	if (Pawn)
