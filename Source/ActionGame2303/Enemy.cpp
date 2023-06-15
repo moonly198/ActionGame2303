@@ -287,6 +287,10 @@ void AEnemy::Attack()
 
 			bAttacking = true;
 			SetInterpToEnemy(true);
+			if (SwingSound)
+			{
+				UGameplayStatics::PlaySound2D(this, SwingSound);
+			}
 
 		}
 	}
