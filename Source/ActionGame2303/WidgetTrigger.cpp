@@ -91,18 +91,18 @@ void AWidgetTrigger::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AA
 				MPC->GameAndUI();
 				Widget->SetVisibility(ESlateVisibility::Visible);
 			}
-			
-
-
 
 		}
+			if (WidgetAsset == MPC->Hint1Asset || WidgetAsset == MPC->Hint2Asset || WidgetAsset == MPC->Hint3Asset)
+			{
+				MPC->bHintVisible = true;
+			}
 	}
 
 
 }
 void AWidgetTrigger::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-
 	Destroy();
 }
 

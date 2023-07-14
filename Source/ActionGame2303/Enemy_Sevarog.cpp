@@ -191,6 +191,10 @@ void AEnemy_Sevarog::Attack()
 void AEnemy_Sevarog::Stunned()
 {
 	AEnemy::Stunned();
+
+	HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HammerCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance)
 	{
@@ -198,11 +202,16 @@ void AEnemy_Sevarog::Stunned()
 		AnimInstance->Montage_JumpToSection(FName("Stun_Start"), StunMontage);
 	}
 
+
+
 }
 
 void AEnemy_Sevarog::CriticalStunned()
 {
 	AEnemy::CriticalStunned();
+
+	HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HammerCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && StunMontage)

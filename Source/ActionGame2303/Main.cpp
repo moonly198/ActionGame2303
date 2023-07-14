@@ -240,11 +240,7 @@ void AMain::Tick(float DeltaTime)
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 		if (AnimInstance && CombatMontage)
 		{
-			if ( AnimInstance->Montage_IsPlaying(CombatMontage))
-			{
-				SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
-			}
-			else if (!AnimInstance->Montage_IsPlaying(CombatMontage))
+			if (!AnimInstance->Montage_IsPlaying(CombatMontage))
 			{
 				if (Stamina > MinSprintStamina)
 				{
@@ -718,7 +714,7 @@ void AMain::Stunned()
 					AnimInstance->Montage_Stop(0.f,CombatMontage);
 				}
 				AnimInstance->Montage_Play(StunMontage, 1.f);
-				AnimInstance->Montage_JumpToSection(FName("Stun_Idle"), StunMontage);
+				AnimInstance->Montage_JumpToSection(FName("Stun_Start"), StunMontage);
 				bAttacking = false;
 
 			}
@@ -1051,7 +1047,7 @@ float AMain::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, ACo
 			SetCombatStatus(ECombatStatus::ECS_StunTakeDamage);
 			LaunchCharacter(EnemyForwardDir * attackedDistance * 3, true, false);  //AttackDistance만큼 앞으로
 			AnimInstance->Montage_Play(CombatMontage, 0.9f);
-			AnimInstance->Montage_JumpToSection(FName("CriticalHitReact"), CombatMontage);
+			AnimInstance->Montage_JumpToSection(FName("Critical_HitReact"), CombatMontage);
 			UGameplayStatics::PlaySound2D(this, CriticalDamagedSound);
 			bStunned = false;
 			bReadyStunned = true;
@@ -1303,13 +1299,14 @@ bool AMain::CanMove(float Value)
 	if (MainPlayerController)
 	{
 		return (Value != 0.0f) &&
-			 (!bDashing) &&
+			(!bDashing) &&
 			(!bAttacking) &&
 			MovementStatus != EMovementStatus::EMS_Stun &&
-			CombatStatus != ECombatStatus::ECS_StunTakeDamage&&
+			CombatStatus != ECombatStatus::ECS_StunTakeDamage &&
 			CombatStatus != ECombatStatus::ECS_TakeDamage &&
 			!bCriticalAttack &&
-			(!bStunned)&&
+			(!bStunned) &&
+			!MainPlayerController->bHintVisible &&
 			!MainPlayerController->bPauseMenuVisible;
 	}
 	return false;
