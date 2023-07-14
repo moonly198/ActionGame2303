@@ -40,6 +40,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 		USoundCue* Attack4Sound;
 
+	//각 공격 스피드
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Speed")
+		float Attack1Speed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Speed")
+		float Attack2Speed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Speed")
+		float Attack3Speed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Speed")
+		float Attack4Speed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Speed")
+		float CriticalAttackSpeed;
+
 
 
 

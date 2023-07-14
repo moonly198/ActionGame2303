@@ -19,6 +19,14 @@ AEnemy_Sevarog::AEnemy_Sevarog()
 	HammerCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("HammerCollision"));
 	HammerCollision->SetupAttachment(GetMesh(), FName("HammerCenter"));
 
+
+	Attack1Speed = 1.f;
+	Attack2Speed = 1.f;
+	Attack3Speed = 1.f;
+	Attack4Speed = 1.f;
+	CriticalAttackSpeed = 1.f;
+
+
 }
 
 
@@ -135,7 +143,7 @@ void AEnemy_Sevarog::Attack()
 			case 0:
 				{
 					SetInterpToEnemy(false);
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_Play(CombatMontage, Attack1Speed);
 					AnimInstance->Montage_JumpToSection(FName("Attack1"), CombatMontage);
 				}
 
@@ -144,14 +152,14 @@ void AEnemy_Sevarog::Attack()
 			case 1:
 				{
 					SetInterpToEnemy(false);
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_Play(CombatMontage, Attack2Speed);
 					AnimInstance->Montage_JumpToSection(FName("Attack2"), CombatMontage);
 				}
 				break;
 			case 2:
 				{
 					SetInterpToEnemy(false);
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_Play(CombatMontage, Attack3Speed);
 					AnimInstance->Montage_JumpToSection(FName("Attack3"), CombatMontage);
 				}
 
@@ -159,7 +167,7 @@ void AEnemy_Sevarog::Attack()
 			case 3:
 				{
 				SetInterpToEnemy(false);
-					AnimInstance->Montage_Play(CombatMontage, 1.f);
+					AnimInstance->Montage_Play(CombatMontage, Attack4Speed);
 					AnimInstance->Montage_JumpToSection(FName("Attack4"), CombatMontage);
 				}
 				break;
@@ -167,7 +175,7 @@ void AEnemy_Sevarog::Attack()
 			{
 				SetInterpToEnemy(false);
 				bCriticalAttack = true;
-				AnimInstance->Montage_Play(CombatMontage, 1.f);
+				AnimInstance->Montage_Play(CombatMontage, CriticalAttackSpeed);
 				AnimInstance->Montage_JumpToSection(FName("CriticalAttack"), CombatMontage);
 			}
 			break;
