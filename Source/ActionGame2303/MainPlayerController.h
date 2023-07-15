@@ -108,8 +108,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
 		UUserWidget* Hint3;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "widgets")
-	bool bHintVisible;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "widgets")
+		bool bHintVisible = false;
 	
 protected:
 	virtual void BeginPlay() override;
